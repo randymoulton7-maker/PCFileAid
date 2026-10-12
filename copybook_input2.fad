@@ -1,0 +1,34 @@
+-------- FIELD LEVEL/NAME --- --PICTURE--    FLD  START     END  LENGTH
+
+    1 TAX-SPS-DTL              GROUP         1       1     107     107
+    5 TAX-CODE-PRTY            X(20)         2       1      20      20
+    5 TAX-SEQ-CNTR             9(08)         3      21      28       8
+    5 TAX-AFP-DATA             GROUP         4      29      78      50
+   10 TAX-LNFRMTYP             X(06)         5      29      34       6
+   10 TAX-REC-TP-DTL           X(02)         6      35      36       2
+   10 TAX-MRK-INDS             GROUP         7      37      52      16
+   15 TAX-READ-VRFY            X             8      37      37       1
+   15 TAX-DMND-FEED            X             9      38      38       1
+   15 TAX-END-SET              X            10      39      39       1
+   15 TAX-INSERTS              X(04)        11      40      43       4
+   15 TAX-ENVLP-MRKNG          X            12      44      44       1
+   15 TAX-DVRT-SEAL            X            13      45      45       1
+   15 TAX-DVRT-UNSEAL          X            14      46      46       1
+   15 FILLER                   X(04)        15      47      50       4
+   15 TAX-PAGE-CNTR            X(01)        16      51      51       1
+   15 FILLER                   X(01)        17      52      52       1
+   10 TAX-DTL-SEQ-NMBR         9(06)        18      53      58       6
+   10 TAX-FILLER               X(20)        19      59      78      20
+    5 TAX-DTL-DATA-GRP         GROUP        20      79    2625    2547
+   10 TAX-DTL-DATA-LNGTH       9(04)        21      79      82       4
+   10 TAX-PRI-INDX             9(04)        22      83      86       4
+   10 TAX-DEPT-CODE            X(03)        23      87      89       3
+   10 FILLER                   X(06)        24      90      95       6
+   10 TAX-TEST-OCCURS(1)       GROUP        25      96      98       3
+   15 TAX-TYPE(1)              X(3)         26      96      98       3
+   10 TAX-TEST-OCCURS(2)       GROUP        25      99     101       3
+   15 TAX-TYPE(2)              X(3)         26      99     101       3
+   10 TAX-TEST-OCCURS(3)       GROUP        25     102     104       3
+   15 TAX-TYPE(3)              X(3)         26     102     104       3
+   10 TAX-TEST-OCCURS(4)       GROUP        25     105     107       3
+   15 TAX-TYPE(4)              X(3)         26     105     107       3

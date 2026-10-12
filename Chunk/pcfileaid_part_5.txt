@@ -1,0 +1,100 @@
+      - Ask user for theme name
+      - Delete theme via Part 2 delete_theme()
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Delete Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Delete Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    delete_theme(cfg, name)
+    messagebox.showinfo("Delete Theme", f"Theme '{name}' deleted.")
+
+
+def menu_edit_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None,
+                    color_picker_callback=None):
+    """
+    Edit Theme… (optional)
+    Behavior:
+      - Ask user for theme name
+      - Load theme
+      - Use color picker to modify colors
+      - Save updated theme
+      - Apply theme immediately
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Edit Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Edit Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    theme = get_theme(cfg, name)
+    if not theme:
+        messagebox.showerror("Edit Theme", "Theme not found.")
+        return
+
+    if color_picker_callback is None:
+        messagebox.showerror("Edit Theme", "No color picker available.")
+        return
+
+    new_colors = color_picker_callback(initial_colors=theme.get("colors"))
+    if not new_colors:
+        return
+
+    updated_theme = {"name": name, "colors": new_colors}
+
+    if not validate_theme(updated_theme):
+        messagebox.showerror("Edit Theme", "Invalid theme data.")
+        return
+
+    add_theme(cfg, updated_theme)
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+# ------------------------------------------------------------
+# Parse a single .fad layout line (fixed-width columns)
+# ------------------------------------------------------------
+def parse_layout_line(line):
+    if len(line) < 70:
+        return None
+
+    level = line[0:5].strip()
+    name  = line[6:31].strip()
+    pic   = line[31:41].strip()
+    fld   = line[41:46].strip()
+    start = line[46:54].strip()
+    end   = line[54:62].strip()
+
+    if not level.isdigit():
+        return None
+
+    return {
+        "level": int(level),
+        "name": name,
+        "pic": pic,
+        "fld": int(fld) if fld else 0,
+        "start": int(start),
+        "end": int(end)
+    }
+
+# ------------------------------------------------------------

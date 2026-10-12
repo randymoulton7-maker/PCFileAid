@@ -1,0 +1,147 @@
+{
+    "themes": {
+        "clam": {
+            "name": "clam",
+            "colors": {
+                "background_color": "#d9d9d9",
+                "text_color": "#000000",
+                "selection_color": "#4a6984",
+                "treeview_row_color_1": "#ffffff",
+                "treeview_row_color_2": "#ffffff",
+                "group_shading_color": "#d9d9d9",
+                "pic_type_color": "#000000",
+                "menu_background_color": "#d9d9d9",
+                "status_background_color": "#d9d9d9"
+            }
+        },
+        "light blue": {
+            "name": "light blue",
+            "colors": {
+                "background_color": "#c8dcf0",
+                "text_color": "#000000",
+                "selection_color": "#78a0c8",
+                "treeview_row_color_1": "#c8dcf0",
+                "treeview_row_color_2": "#dcebfa",
+                "group_shading_color": "#b4cde6",
+                "pic_type_color": "#000000",
+                "menu_background_color": "#c8dcf0",
+                "status_background_color": "#bed2e6"
+            }
+        },
+        "Alt": {
+            "name": "Alt",
+            "colors": {
+                "background_color": "#f0f0ed",
+                "text_color": "#000000",
+                "selection_color": "#99b4d1",
+                "treeview_row_color_1": "#ffffff",
+                "treeview_row_color_2": "#f5f5f3",
+                "group_shading_color": "#e8e8e6",
+                "pic_type_color": "#000000",
+                "menu_background_color": "#f0f0ed",
+                "status_background_color": "#e8e8e6"
+            }
+        },
+        "Sandstone": {
+            "name": "Sandstone",
+            "colors": {
+                "background_color": "#ebe1cd",
+                "text_color": "#000000",
+                "selection_color": "#b48c5a",
+                "treeview_row_color_1": "#ebe1cd",
+                "treeview_row_color_2": "#f5ebd7",
+                "group_shading_color": "#dccdb9",
+                "pic_type_color": "#000000",
+                "menu_background_color": "#ebe1cd",
+                "status_background_color": "#e1d2be"
+            }
+        },
+        "Slate Rose": {
+            "name": "Slate Rose",
+            "colors": {
+                "background_color": "#d7d2e1",
+                "text_color": "#000000",
+                "selection_color": "#a05f78",
+                "treeview_row_color_1": "#d7d278",
+                "treeview_row_color_2": "#e1dcff",
+                "group_shading_color": "#c8c3d2",
+                "pic_type_color": "#000000",
+                "menu_background_color": "#d7d2e1",
+                "status_background_color": "#cdc8d7"
+            }
+        },
+        "Modern 3270 Black": {
+            "name": "Modern 3270 Black",
+            "colors": {
+                "background_color": "#020202",
+                "text_color": "#00d200",
+                "selection_color": "#78b48c",
+                "accent_color": "#78b48c",
+                "accent_text_color": "#195a3c",
+                "selection_text_color": "#195a3c",
+                "treeview_row_color_1": "#000080",
+                "treeview_row_color_2": "#800040",
+                "group_shading_color": "#232323",
+                "pic_type_color": "#c8ffc8",
+                "menu_background_color": "#8000ff",
+                "status_background_color": "#191919"
+            }
+        },
+        "Dusk": {
+            "name": "Dusk",
+            "colors": {
+                "background_color": "#202020",
+                "text_color": "#00ff00",
+                "selection_color": "#ffcc00",
+                "accent_text_color": "#ffff00",
+                "selection_text_color": "#ffff00",
+                "treeview_row_color_1": "#8000ff",
+                "treeview_row_color_2": "#a0a0a0",
+                "group_shading_color": "#9898b1",
+                "pic_type_color": "#66ccff",
+                "menu_background_color": "#8a8a8a",
+                "status_background_color": "#4d4d4d"
+            }
+        },
+        "Light Blue Grey": {
+            "name": "Dark Gray",
+            "colors": {
+                "background_color": "#ebeef2",
+                "text_color": "#000000",
+                "selection_color": "#19508c",
+                "treeview_row_color_1": "#ebeef2",
+                "treeview_row_color_2": "#f5f8fa",
+                "group_shading_color": "#dce1e6",
+                "pic_type_color": "#19508c",
+                "menu_background_color": "#ebeef2",
+                "status_background_color": "#e1e6eb"
+            }
+        },
+        "Verdant Mist": {
+            "name": "Deep Green",
+            "colors": {
+                "background_color": "#f0f5f0",
+                "text_color": "#000000",
+                "selection_color": "#aad2b9",
+                "treeview_row_color_1": "#f0f5f0",
+                "treeview_row_color_2": "#fafcfa",
+                "group_shading_color": "#e1ebfa",
+                "pic_type_color": "#146e3c",
+                "menu_background_color": "#f0f5f0",
+                "status_background_color": "#e6f0e6"
+            }
+        }
+    },
+    "active_theme": "Alt",
+    "theme_names": [
+        "clam",
+        "light blue",
+        "Alt",
+        "Sandstone",
+        "Slate Rose",
+        "Modern 3270 Black",
+        "Dusk",
+        "Light Blue Grey",
+        "Verdant Mist"
+    ]
+}

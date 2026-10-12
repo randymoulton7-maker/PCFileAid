@@ -1,0 +1,1483 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, simpledialog, messagebox
+from tkinter import colorchooser
+
+# ------------------------------------------------------------
+# NEW: Tiny JSON config system (safe, add-only)
+# ------------------------------------------------------------
+import json
+import os
+
+CONFIG_FILENAME = "pcfileaid_config.json"
+
+def load_config():
+    """Load configuration from JSON file stored in same folder as pcfileaid.py."""
+    if not os.path.exists(CONFIG_FILENAME):
+        return {
+            "themes": {},
+            "active_theme": None,
+            "theme_names": []
+        }
+    try:
+        with open(CONFIG_FILENAME, "r") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+        
+    # Ensure required keys exist
+    cfg.setdefault("themes", {})
+    cfg.setdefault("active_theme", None)
+    cfg.setdefault("theme_names", list(cfg["themes"].keys()))
+    return cfg
+# ------------------------------------------------------------
+# Part 2: Theme Storage Logic (Add-only implementation)
+# ------------------------------------------------------------
+
+def add_theme(cfg, theme_dict):
+    """
+    Add a new theme or update an existing one.
+    Behavior:
+      - Insert or replace theme in cfg["themes"]
+      - Ensure theme name exists in cfg["theme_names"]
+      - Save configuration immediately
+    """
+    name = theme_dict.get("name")
+    if not name:
+        return
+
+    # Add or update theme dictionary
+    cfg["themes"][name] = theme_dict
+
+    # Ensure theme name is in the list
+    if name not in cfg["theme_names"]:
+        cfg["theme_names"].append(name)
+
+    # Persist change
+    save_config(cfg)
+
+
+def delete_theme(cfg, name):
+    """
+    Delete a theme from configuration.
+    Behavior:
+      - Remove from cfg["themes"]
+      - Remove from cfg["theme_names"]
+      - Clear active_theme if necessary
+      - Save configuration immediately
+    """
+    if name in cfg["themes"]:
+        del cfg["themes"][name]
+
+    if name in cfg["theme_names"]:
+        cfg["theme_names"].remove(name)
+
+    if cfg.get("active_theme") == name:
+        cfg["active_theme"] = None
+
+    save_config(cfg)
+
+
+def get_theme(cfg, name):
+    """
+    Retrieve a theme dictionary by name.
+    Behavior:
+      - Validate theme name
+      - Return theme dictionary or None
+    """
+    return cfg.get("themes", {}).get(name)
+
+
+def set_active_theme(cfg, name):
+    """
+    Set the active theme.
+    Behavior:
+      - Update cfg["active_theme"]
+      - Save configuration immediately
+    """
+    if name in cfg.get("themes", {}):
+        cfg["active_theme"] = name
+        save_config(cfg)
+
+
+def list_themes(cfg):
+    """
+    Return list of available theme names.
+    """
+    return cfg.get("theme_names", [])
+
+
+def validate_theme(theme_dict):
+    """
+    Validate theme dictionary structure.
+    Behavior:
+      - Must contain 'name'
+      - Must contain 'colors'
+      - 'colors' must be a dictionary
+    """
+    if not isinstance(theme_dict, dict):
+        return False
+    if "name" not in theme_dict:
+        return False
+    if "colors" not in theme_dict:
+        return False
+    if not isinstance(theme_dict["colors"], dict):
+        return False
+    return True
+
+def save_config(cfg):
+    """Save configuration to JSON file."""
+    try:
+        with open(CONFIG_FILENAME, "w") as f:
+            json.dump(cfg, f, indent=4)
+    except Exception as e:
+        print("Error saving config:", e)
+# ------------------------------------------------------------
+# Part 3: Theme Application (Add-only implementation)
+# ------------------------------------------------------------
+
+def apply_theme_to_style(root,
+                         theme_dict,
+                         main_tree=None,
+                         value_tree=None,
+                         viewer_widget=None,
+                         status_label=None,
+                         menubar=None):
+    """
+    Apply a theme dictionary to ttk.Style and key UI widgets.
+    Behavior:
+      - Uses theme_dict["colors"] for all color values
+      - Updates root, menus, Treeviews, and viewer
+      - Works immediately without restart
+    """
+    if not theme_dict:
+        return
+
+    colors = theme_dict.get("colors", {})
+    bg = colors.get("background_color", "#202020")
+    fg = colors.get("text_color", "#FFFFFF")
+    sel = colors.get("selection_color", "#FFCC00")
+    row1 = colors.get("treeview_row_color_1", "#1E1E1E")
+    row2 = colors.get("treeview_row_color_2", "#252525")
+    group_bg = colors.get("group_shading_color", "#e0e0ff")
+    pic_color = colors.get("pic_type_color", "#66CCFF")
+    menu_bg = colors.get("menu_background_color", bg)
+    status_bg = colors.get("status_background_color", bg)
+
+    style = ttk.Style(root)
+
+    # Root background
+    try:
+        root.configure(bg=bg)
+    except Exception:
+        pass
+
+    # Menubar (if provided)
+    if menubar is not None:
+        try:
+            menubar.configure(bg=menu_bg)
+        except Exception:
+            pass
+        try:
+            root.config(menu=menubar)
+        except Exception:
+            pass
+
+    # Status bar
+    if status_label is not None:
+        try:
+            status_label.configure(bg=status_bg, fg=fg)
+        except Exception:
+            pass
+
+    # Viewer widget (e.g., Text)
+    if viewer_widget is not None:
+        try:
+            viewer_widget.configure(bg=bg, fg=fg, insertbackground=fg)
+        except Exception:
+            pass
+    # ------------------------------------------------------------
+    # Part 6: Apply theme to top controls (ttk widgets)
+    # ------------------------------------------------------------
+    try:
+        # Create ttk styles for top controls
+        style.configure("Top.TFrame", background=bg)
+        style.configure("Top.TLabel", background=bg, foreground=fg)
+        style.configure("Top.TEntry", fieldbackground=bg, foreground=fg)
+        style.configure("Top.TButton", background=bg, foreground=fg)
+
+        # Global option overrides (helps ttk behave consistently)
+        root.option_add("*TFrame*Background", bg)
+        root.option_add("*TLabel*Background", bg)
+        root.option_add("*TLabel*Foreground", fg)
+        root.option_add("*TEntry*FieldBackground", bg)
+        root.option_add("*TEntry*Foreground", fg)
+        root.option_add("*TButton*Background", bg)
+        root.option_add("*TButton*Foreground", fg)
+
+    except Exception:
+        pass
+
+    # Treeview styling
+    style.configure("Treeview",
+                    background=row1,
+                    fieldbackground=row1,
+                    foreground=fg)
+    style.map("Treeview",
+              background=[("selected", sel)],
+              foreground=[("selected", fg)])
+
+    # Alternate row tags for main_tree
+    if main_tree is not None:
+        try:
+            main_tree.tag_configure("evenrow", background=row1, foreground=fg)
+            main_tree.tag_configure("oddrow", background=row2, foreground=fg)
+            main_tree.tag_configure("group", background=group_bg, foreground=fg)
+        except Exception:
+            pass
+
+    # Alternate row tags for value_tree
+    if value_tree is not None:
+        try:
+            value_tree.tag_configure("evenrow", background=row1, foreground=fg)
+            value_tree.tag_configure("oddrow", background=row2, foreground=fg)
+        except Exception:
+            pass
+
+    # PIC type color can be used by any widget that highlights PIC fields;
+    # here we just expose it for future use.
+    # No direct widget binding is enforced in Part 3.
+
+
+def apply_active_theme(cfg,
+                       root,
+                       main_tree=None,
+                       value_tree=None,
+                       viewer_widget=None,
+                       status_label=None,
+                       menubar=None):
+    """
+    Enforce the active theme at runtime.
+    Behavior:
+      - Reads cfg["active_theme"]
+      - Retrieves theme from cfg["themes"]
+      - Applies theme immediately via apply_theme_to_style
+    """
+    active_name = cfg.get("active_theme")
+    if not active_name:
+        return
+
+    theme = get_theme(cfg, active_name)
+    if not theme:
+        return
+
+    apply_theme_to_style(root,
+                         theme,
+                         main_tree=main_tree,
+                         value_tree=value_tree,
+                         viewer_widget=viewer_widget,
+                         status_label=status_label,
+                         menubar=menubar)
+
+
+def apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=None,
+                               value_tree=None,
+                               viewer_widget=None,
+                               status_label=None,
+                               menubar=None):
+    """
+    Integrate theme application with the existing config system.
+    Behavior:
+      - Set cfg["active_theme"] via set_active_theme
+      - Save configuration
+      - Apply theme immediately
+    """
+    theme = get_theme(cfg, name)
+    if not theme:
+        return
+
+    # Update active theme in config and persist
+    set_active_theme(cfg, name)
+
+    # Apply theme to UI
+    apply_theme_to_style(root,
+                         theme,
+                         main_tree=main_tree,
+                         value_tree=value_tree,
+                         viewer_widget=viewer_widget,
+                         status_label=status_label,
+                         menubar=menubar)
+# ------------------------------------------------------------
+# Part 4: Theme Menu Integration (Add-only implementation)
+# ------------------------------------------------------------
+
+def menu_save_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None,
+                    color_picker_callback=None):
+    """
+    Save Theme…
+    Behavior:
+      - Use color_picker_callback() to get a color dictionary
+      - Ask user for theme name
+      - Add or update theme via Part 2 add_theme()
+      - Apply theme immediately via Part 3 apply_and_set_active_theme()
+    """
+    if color_picker_callback is None:
+        messagebox.showerror("Save Theme", "No color picker available.")
+        return
+
+    colors = color_picker_callback()
+    if not colors:
+        messagebox.showwarning("Save Theme", "No colors selected.")
+        return
+
+    name = simpledialog.askstring("Save Theme", "Enter theme name:")
+    if not name:
+        return
+
+    theme_dict = {"name": name, "colors": colors}
+
+    if not validate_theme(theme_dict):
+        messagebox.showerror("Save Theme", "Invalid theme data.")
+        return
+
+    add_theme(cfg, theme_dict)
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+
+def menu_load_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None):
+    """
+    Load Theme…
+    Behavior:
+      - Show list of theme names
+      - Ask user for theme name
+      - Retrieve theme via Part 2 get_theme()
+      - Apply theme immediately via Part 3 apply_and_set_active_theme()
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Load Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Load Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+
+def menu_delete_theme(cfg):
+    """
+    Delete Theme…
+    Behavior:
+      - Show list of theme names
+      - Ask user for theme name
+      - Delete theme via Part 2 delete_theme()
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Delete Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Delete Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    delete_theme(cfg, name)
+    messagebox.showinfo("Delete Theme", f"Theme '{name}' deleted.")
+
+
+def menu_edit_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None,
+                    color_picker_callback=None):
+    """
+    Edit Theme… (optional)
+    Behavior:
+      - Ask user for theme name
+      - Load theme
+      - Use color picker to modify colors
+      - Save updated theme
+      - Apply theme immediately
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Edit Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Edit Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    theme = get_theme(cfg, name)
+    if not theme:
+        messagebox.showerror("Edit Theme", "Theme not found.")
+        return
+
+    if color_picker_callback is None:
+        messagebox.showerror("Edit Theme", "No color picker available.")
+        return
+
+    new_colors = color_picker_callback(initial_colors=theme.get("colors"))
+    if not new_colors:
+        return
+
+    updated_theme = {"name": name, "colors": new_colors}
+
+    if not validate_theme(updated_theme):
+        messagebox.showerror("Edit Theme", "Invalid theme data.")
+        return
+
+    add_theme(cfg, updated_theme)
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+# ------------------------------------------------------------
+# Parse a single .fad layout line (fixed-width columns)
+# ------------------------------------------------------------
+def parse_layout_line(line):
+    if len(line) < 70:
+        return None
+
+    level = line[0:5].strip()
+    name  = line[6:31].strip()
+    pic   = line[31:41].strip()
+    fld   = line[41:46].strip()
+    start = line[46:54].strip()
+    end   = line[54:62].strip()
+
+    if not level.isdigit():
+        return None
+
+    return {
+        "level": int(level),
+        "name": name,
+        "pic": pic,
+        "fld": int(fld) if fld else 0,
+        "start": int(start),
+        "end": int(end)
+    }
+
+# ------------------------------------------------------------
+# Load .fad layout file
+# ------------------------------------------------------------
+def load_layout_file(path):
+    fields = []
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    lines = lines[2:]  # skip header + blank line
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        field = parse_layout_line(line)
+        if field:
+            fields.append(field)
+
+    return fields
+
+# ------------------------------------------------------------
+# Load data file (binary)
+# ------------------------------------------------------------
+def load_data_file(path):
+    with open(path, "rb") as f:
+        data = f.read()
+
+    data = data.replace(b"\r", b"").replace(b"\n", b"")
+    return bytearray(data)
+
+# ------------------------------------------------------------
+# Extract field value from record
+# ------------------------------------------------------------
+def extract_field_value(data, record_length, record_index, field):
+    if record_length <= 0:
+        return ""
+
+    start = field["start"] - 1
+    end   = field["end"]
+    length = end - start
+
+    offset = record_index * record_length + start
+    if offset < 0 or offset + length > len(data):
+        return ""
+
+    raw = data[offset:offset + length]
+
+    try:
+        text = raw.decode("utf-8", errors="replace")
+    except Exception:
+        text = raw.decode("latin-1", errors="replace")
+
+    return text.rstrip()
+def rename_theme(cfg, old_name, new_name):
+    """
+    Rename a theme without deleting or recreating it.
+    Add‑only. No restructuring.
+    """
+    # Move theme dictionary
+    cfg["themes"][new_name] = cfg["themes"].pop(old_name)
+
+    # Update theme_names list
+    try:
+        idx = cfg["theme_names"].index(old_name)
+        cfg["theme_names"][idx] = new_name
+    except ValueError:
+        pass
+
+    # Update active theme if needed
+    if cfg.get("active_theme") == old_name:
+        cfg["active_theme"] = new_name
+
+    # Save config
+    save_config(cfg)
+
+def menu_rename_theme(cfg):
+    """
+    UI dialog to rename an existing theme.
+    Add‑only. No restructuring.
+    """
+    import tkinter.simpledialog as sd
+    import tkinter.messagebox as mb
+
+    # Pick old theme name
+    old_name = sd.askstring("Rename Theme", "Enter the CURRENT theme name:")
+    if not old_name:
+        return
+
+    if old_name not in cfg.get("themes", {}):
+        mb.showerror("Rename Theme", f"Theme '{old_name}' does not exist.")
+        return
+
+    # Pick new theme name
+    new_name = sd.askstring("Rename Theme", "Enter the NEW theme name:")
+    if not new_name:
+        return
+
+    if new_name in cfg.get("themes", {}):
+        mb.showerror("Rename Theme", f"Theme '{new_name}' already exists.")
+        return
+
+    # Perform rename
+    rename_theme(cfg, old_name, new_name)
+    mb.showinfo("Rename Theme", f"Theme renamed to '{new_name}'.")
+
+# ------------------------------------------------------------
+# Part 5: Color Picker Dialog (Add-only implementation)
+# ------------------------------------------------------------
+
+def pick_color(title, initial):
+    """
+    Helper: open a color chooser dialog.
+    Returns a hex color string or the initial value if cancelled.
+    """
+    import tkinter.colorchooser as cc
+    color = cc.askcolor(title=title, color=initial)
+    if color and color[1]:
+        return color[1]
+    return initial
+
+def pick_theme_colors(initial_colors=None):
+    """
+    Interactive color picker for all theme colors.
+    Returns a complete theme color dictionary.
+    """
+    if initial_colors is None:
+        initial_colors = {}
+
+    # Default values if missing
+    bg = initial_colors.get("background_color", "#202020")
+    fg = initial_colors.get("text_color", "#FFFFFF")
+    sel = initial_colors.get("selection_color", "#FFCC00")
+    row1 = initial_colors.get("treeview_row_color_1", "#1E1E1E")
+    row2 = initial_colors.get("treeview_row_color_2", "#252525")
+    group_bg = initial_colors.get("group_shading_color", "#303040")
+    pic_color = initial_colors.get("pic_type_color", "#66CCFF")
+    menu_bg = initial_colors.get("menu_background_color", bg)
+    status_bg = initial_colors.get("status_background_color", bg)
+
+    # Pick each color interactively
+    bg = pick_color("Background Color", bg)
+    fg = pick_color("Text Color", fg)
+    sel = pick_color("Selection Color", sel)
+    row1 = pick_color("Treeview Row Color 1", row1)
+    row2 = pick_color("Treeview Row Color 2", row2)
+    group_bg = pick_color("Group Shading Color", group_bg)
+    pic_color = pick_color("PIC Type Color", pic_color)
+    menu_bg = pick_color("Menu Background Color", menu_bg)
+    status_bg = pick_color("Status Background Color", status_bg)
+
+    return {
+        "background_color": bg,
+        "text_color": fg,
+        "selection_color": sel,
+        "treeview_row_color_1": row1,
+        "treeview_row_color_2": row2,
+        "group_shading_color": group_bg,
+        "pic_type_color": pic_color,
+        "menu_background_color": menu_bg,
+        "status_background_color": status_bg
+    }
+# ------------------------------------------------------------
+# Part 6: Apply theme to top controls (ttk widgets)
+# ------------------------------------------------------------
+def apply_theme_to_top_controls(root, colors):
+    """
+    Recolors the top controls (ttk Frame, ttk Label, ttk Entry, ttk Button)
+    using ttk Style so that custom themes affect the entire top bar.
+    """
+
+    style = ttk.Style(root)
+
+    bg = colors["background_color"]
+    fg = colors["text_color"]
+
+    # Frame background
+    style.configure("Top.TFrame", background=bg)
+
+    # Label styling
+    style.configure("Top.TLabel", background=bg, foreground=fg)
+
+    # Entry styling
+    style.configure("Top.TEntry", fieldbackground=bg, foreground=fg)
+
+    # Button styling
+    style.configure("Top.TButton", background=bg, foreground=fg)
+
+    # Apply styles globally to your top widgets
+    root.option_add("*TFrame*Background", bg)
+    root.option_add("*TLabel*Background", bg)
+    root.option_add("*TLabel*Foreground", fg)
+    root.option_add("*TEntry*FieldBackground", bg)
+    root.option_add("*TEntry*Foreground", fg)
+    root.option_add("*TButton*Background", bg)
+    root.option_add("*TButton*Foreground", fg)
+
+# ------------------------------------------------------------
+# Main UI
+# ------------------------------------------------------------
+class FileAidViewer:
+    # --------------------------------------------------------
+    # Theme handling
+    # --------------------------------------------------------
+    def apply_custom_theme(self, bg, fg, tree_bg, tree_fg, select_bg):
+        style = ttk.Style()
+
+        # General widget colors
+        style.configure(".", background=bg, foreground=fg)
+
+        # Treeview colors
+        style.configure(
+            "Treeview",
+            background=tree_bg,
+            fieldbackground=tree_bg,
+            foreground=tree_fg,
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", select_bg)],
+            foreground=[("selected", tree_fg)],
+        )
+
+        # Text widget
+        try:
+            self.edit_box.configure(bg=bg, fg=fg, insertbackground=fg)
+        except Exception:
+            pass
+
+        # Status bar
+        try:
+            self.status_label.configure(bg=bg, fg=fg)
+        except Exception:
+            pass
+        
+        # Root window
+        try:
+            self.root.configure(bg=bg)
+        except Exception:
+            pass       
+
+        # Update ALL frames, labels, and buttons automatically
+        for widget in self.root.winfo_children():
+            try:
+                widget.configure(bg=bg)
+            except:
+                pass
+
+            for child in widget.winfo_children():
+                try:
+                    child.configure(bg=bg, fg=fg)
+                except:
+                    pass    
+
+        style.configure("Custom.TFrame", background=bg)
+
+        # Update buttons
+        style.configure("TButton", background=bg, foreground=fg)
+
+        # Update labels
+        style.configure("TLabel", background=bg, foreground=fg)
+
+    def set_dark_gray_theme(self):
+        self.apply_custom_theme(
+            bg="#202020",
+            fg="#e0e0e0",
+            tree_bg="#303030",
+            tree_fg="#e0e0e0",
+            select_bg="#505050",
+        )
+
+    def set_dark_blue_theme(self):
+        self.apply_custom_theme(
+            bg="#101820",
+            fg="#e0f0ff",
+            tree_bg="#182030",
+            tree_fg="#e0f0ff",
+            select_bg="#305080",
+        )
+    def set_light_theme(self):
+        self.apply_custom_theme(
+            bg="#f0f0f0",
+            fg="#000000",
+            tree_bg="#ffffff",
+            tree_fg="#000000",
+            select_bg="#c0c0ff",
+        )
+    def set_light_blue_theme(self):
+        self.apply_custom_theme(
+            bg="#e6f0ff",        # very light blue background
+            fg="#000000",        # black text
+            tree_bg="#d0e0ff",   # light blue tree background
+            tree_fg="#000000",   # black tree text
+            select_bg="#a0b8ff", # medium blue selection
+        )
+
+
+    def set_blackout_theme(self):
+        self.apply_custom_theme(
+            bg="#000000",
+            fg="#ffffff",
+            tree_bg="#101010",
+            tree_fg="#ffffff",
+            select_bg="#404040",
+        )
+
+    def pick_custom_theme(self):
+        bg_color = colorchooser.askcolor(title="Background color")[1]
+        if not bg_color:
+            return
+        fg_color = colorchooser.askcolor(title="Foreground color")[1]
+        if not fg_color:
+            return
+        tree_bg = colorchooser.askcolor(title="Tree background")[1]
+        if not tree_bg:
+            return
+        tree_fg = colorchooser.askcolor(title="Tree foreground")[1]
+        if not tree_fg:
+            return
+        select_bg = colorchooser.askcolor(title="Selection background")[1]
+        if not select_bg:
+            return
+
+        self.apply_custom_theme(
+            bg=bg_color,
+            fg=fg_color,
+            tree_bg=tree_bg,
+            tree_fg=tree_fg,
+            select_bg=select_bg,
+        )
+
+    def perform_find(self, search_text):
+        if not search_text or self.record_length <= 0 or not self.layout:
+            return
+
+        search_text_lower = search_text.lower()
+
+        # Search from current record forward, then wrap
+        start_rec = self.current_record
+        total = self.total_records
+
+        for i in range(total):
+            rec = (start_rec + i) % total
+
+            # Check each field in the record
+            for f in self.layout:
+                val = extract_field_value(self.data, self.record_length, rec, f)
+                if search_text_lower in val.lower():
+                    # Found match
+                    self.current_record = rec
+
+                    # Update UI
+                    self.record_entry.delete(0, tk.END)
+                    self.record_entry.insert(0, str(rec + 1))
+                    self.update_record_count()
+                    self.refresh_values()
+
+                    # Select the field in the left tree
+                    idx = self.layout.index(f)
+                    item = self.tree.get_children()[idx]
+                    self.tree.selection_set(item)
+                    self.tree.see(item)
+
+                    # Load into edit box
+                    self.edit_box.delete("1.0", tk.END)
+                    self.edit_box.insert("1.0", val)
+
+                    return
+
+        # If nothing found
+        tk.messagebox.showinfo("Find", f"'{search_text}' not found.")
+
+    def find_value(self):
+        win = tk.Toplevel(self.root)
+        win.title("Find")
+        win.geometry("300x120")
+        win.resizable(False, False)
+
+        ttk.Label(win, text="Find text:").pack(pady=5)
+
+        entry = ttk.Entry(win, width=30)
+        entry.pack(pady=5)
+        entry.focus()
+
+        def do_find():
+            text = entry.get()
+            win.destroy()
+            self.perform_find(text)
+
+        ttk.Button(win, text="Find", command=do_find).pack(pady=5)
+
+    def __init__(self, root):
+        self.root = root
+        self.config = load_config()
+        self.status_label = tk.Label(self.root, text="", anchor="w")
+        self.status_label.pack(fill="x", side="bottom")
+
+        self.root.title("PC FileAid Viewer")
+
+        self.layout = []
+        self.data = bytearray()
+        self.record_length = 0
+        self.current_record = 0
+        self.data_file_path = None
+        self.total_records = 0
+
+        frame = ttk.Frame(root)
+        frame.pack(fill="both", expand=True)
+
+        # --------------------------------------------------------
+        # TOP CONTROLS
+        # --------------------------------------------------------
+        top = ttk.Frame(frame, style="Top.TFrame")
+        top.pack(fill="x")
+
+        ttk.Label(top, text="Record:", style="Top.TLabel").pack(side="left", padx=2)
+
+        self.record_entry = ttk.Entry(top, width=6, style="Top.TEntry")
+        self.record_entry.pack(side="left")
+        self.record_entry.insert(0, "1")
+
+        self.prev_button = ttk.Button(top, text="Prev",
+                                      command=self.prev_record,
+                                      style="Top.TButton")
+        self.prev_button.pack(side="left", padx=2)
+
+        self.next_button = ttk.Button(top, text="Next",
+                                      command=self.next_record,
+                                      style="Top.TButton")
+        self.next_button.pack(side="left", padx=2)
+
+        self.record_label = ttk.Label(top, text="Record 0 of 0", style="Top.TLabel")
+        self.record_label.pack(side="left", padx=10)
+
+        # Data file name display
+        self.filename_label = ttk.Label(top, text="No data file loaded", style="Top.TLabel")
+        self.filename_label.pack(side="right", padx=10)
+
+
+        # --------------------------------------------------------
+        # JUMP-TO-RECORD CONTROLS
+        # --------------------------------------------------------
+        jump_frame = ttk.Frame(top)
+        jump_frame.pack(side="left", padx=20)
+
+        ttk.Label(jump_frame, text="Jump to:").pack(side="left")
+
+        self.jump_entry = ttk.Entry(jump_frame, width=8)
+        self.jump_entry.pack(side="left", padx=2)
+
+        ttk.Button(jump_frame, text="Go", command=self.jump_to_record).pack(side="left")
+
+        # --------------------------------------------------------
+        # SPLIT PANE
+        # --------------------------------------------------------
+        paned = ttk.Panedwindow(frame, orient="horizontal")
+        paned.pack(fill="both", expand=True)
+
+        # LEFT PANE (LAYOUT)
+        left_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=1)
+
+        self.tree = ttk.Treeview(
+            left_frame,
+            columns=("level", "name", "pic", "start", "end"),
+            show="headings"
+        )
+
+        self.tree.heading("level", text="FIELD LEVEL")
+        self.tree.heading("name",  text="FIELD NAME")
+        self.tree.heading("pic",   text="PICTURE")
+        self.tree.heading("start", text="FLD START")
+        self.tree.heading("end",   text="FLD END")
+
+        self.tree.column("level", width=80)
+        self.tree.column("name",  width=220)
+        self.tree.column("pic",   width=100)
+        self.tree.column("start", width=80)
+        self.tree.column("end",   width=80)
+
+        self.tree.tag_configure("group", background="#e0e0ff")
+
+        tree_scroll = ttk.Scrollbar(left_frame, orient="vertical", command=self._scroll_both)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        tree_scroll.pack(side="right", fill="y")
+
+        # RIGHT PANE (VALUES)
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame, weight=1)
+
+        self.value_tree = ttk.Treeview(
+            right_frame,
+            columns=("value",),
+            show="headings"
+        )
+        self.value_tree.heading("value", text="VALUE")
+        self.value_tree.column("value", width=400)
+
+        value_scroll = ttk.Scrollbar(right_frame, orient="vertical", command=self._scroll_both)
+        self.value_tree.configure(yscrollcommand=value_scroll.set)
+
+        self.value_tree.pack(side="left", fill="both", expand=True)
+        value_scroll.pack(side="right", fill="y")
+
+        # --------------------------------------------------------
+        # EDIT BOX + RULER (correct placement)
+        # --------------------------------------------------------
+        bottom = ttk.Frame(frame)
+        bottom.pack(fill="x")
+
+        # Left column: label
+        label_frame = ttk.Frame(bottom)
+        label_frame.pack(side="left", padx=2, anchor="n")
+        ttk.Label(label_frame, text="Edit field value:").pack()
+
+        # Right column: ruler + textbox
+        edit_frame = ttk.Frame(bottom)
+        edit_frame.pack(side="left", fill="x", expand=True)
+
+        # Ruler directly above textbox
+        self.ruler = tk.Text(edit_frame, height=1, font=("Courier New", 10), bd=0)
+        self.ruler.pack(fill="x")
+        self.ruler.config(state="disabled")
+
+        # Make ruler truly non-editable and non-focusable
+        self.ruler.bind("<Key>", lambda e: "break")
+        self.ruler.bind("<Button-1>", lambda e: "break")
+
+        # Textbox
+        self.edit_box = tk.Text(edit_frame, height=3, font=("Courier New", 10))
+        self.edit_box.pack(fill="x", expand=True)
+
+        self.apply_button = ttk.Button(bottom, text="Apply", command=self.apply_edit)
+        self.apply_button.pack(side="left", padx=4)
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_field_select)
+
+        # --------------------------------------------------------
+        # MENU
+        # --------------------------------------------------------
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        filemenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=filemenu)
+       
+        thememenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Theme", menu=thememenu)
+
+        thememenu.add_command(
+            label="Save Theme…",
+            command=lambda: menu_save_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar,
+                color_picker_callback=self.get_custom_colors
+            )
+        )
+
+        thememenu.add_command(
+            label="Load Theme…",
+            command=lambda: menu_load_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar
+            )
+        )
+
+        thememenu.add_command(
+            label="Delete Theme…",
+            command=lambda: menu_delete_theme(self.config)
+        )
+
+        thememenu.add_command(
+            label="Edit Theme…",
+            command=lambda: menu_edit_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar,
+                color_picker_callback=self.get_custom_colors
+            )
+        )
+        thememenu.add_command(
+            label="Rename Theme…",
+            command=lambda: menu_rename_theme(self.config)
+        )
+
+        filemenu.add_command(label="Open Layout (.fad)", command=self.open_layout)
+        filemenu.add_command(label="Open Data File", command=self.open_data)
+        filemenu.add_command(label="New Data File", command=self.new_data_file)
+        filemenu.add_separator()
+        filemenu.add_command(label="Save Data File", command=self.save_data_file)
+        filemenu.add_command(label="Save Data File As...", command=self.save_data_file_as)
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=self.root.destroy)
+
+        editmenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=editmenu)
+
+        editmenu.add_command(label="Insert Record", command=self.insert_record)
+        editmenu.add_command(label="Delete Record", command=self.delete_record)
+        editmenu.add_command(label="Find...", command=self.find_value)
+
+    # --------------------------------------------------------
+    # Scroll sync
+    # --------------------------------------------------------
+    def _scroll_both(self, *args):
+        self.tree.yview(*args)
+        self.value_tree.yview(*args)
+
+    # --------------------------------------------------------
+    # OPEN LAYOUT
+    # --------------------------------------------------------
+    def open_layout(self):
+        path = filedialog.askopenfilename(
+            title="Select .fad Layout File",
+            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.layout = load_layout_file(path)
+        self.tree.delete(*self.tree.get_children())
+        self.value_tree.delete(*self.value_tree.get_children())
+
+        for f in self.layout:
+            tags = ("group",) if f["pic"].upper() == "GROUP" else ()
+            self.tree.insert(
+                "",
+                "end",
+                values=(f["level"], f["name"], f["pic"], f["start"], f["end"]),
+                tags=tags
+            )
+            self.value_tree.insert("", "end", values=(""))
+
+        self.record_length = self.layout[-1]["end"] if self.layout else 0
+        self.current_record = 0
+
+        if self.data and self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.update_ruler()
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # OPEN DATA FILE
+    # --------------------------------------------------------
+    def open_data(self):
+        path = filedialog.askopenfilename(
+            title="Select Data File",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.data_file_path = path
+        self.data = load_data_file(path)
+
+        self.filename_label.config(text=f"Data File: {path}")
+
+        if self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.current_record = 0
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # NEW DATA FILE
+    # --------------------------------------------------------
+    def new_data_file(self):
+        self.data = bytearray()
+        self.data_file_path = None
+
+        self.current_record = 0
+        self.total_records = 0
+
+        self.value_tree.delete(*self.value_tree.get_children())
+        self.tree.selection_remove(self.tree.selection())
+        self.clear_edit_box()
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+
+        self.filename_label.config(text="New data file (unsaved)")
+        self.update_ruler()
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE
+    # --------------------------------------------------------
+    def save_data_file(self):
+        if not self.data_file_path:
+            return
+
+        if self.record_length <= 0:
+            return
+
+        total = len(self.data) // self.record_length
+        output = []
+
+        for rec in range(total):
+            start = rec * self.record_length
+            end = start + self.record_length
+            output.append(self.data[start:end])
+
+        # Insert CRLF between records
+        final_bytes = b"\r\n".join(output)
+
+        with open(self.data_file_path, "wb") as f:
+            f.write(final_bytes)
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE AS
+    # --------------------------------------------------------
+    def save_data_file_as(self):
+        path = filedialog.asksaveasfilename(
+            title="Save Data File As",
+            defaultextension="",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        if self.record_length <= 0:
+            return
+
+        total = len(self.data) // self.record_length
+        output = []
+
+        for rec in range(total):
+            start = rec * self.record_length
+            end = start + self.record_length
+            output.append(self.data[start:end])
+
+        final_bytes = b"\r\n".join(output)
+
+        with open(path, "wb") as f:
+            f.write(final_bytes)
+
+        self.data_file_path = path
+        self.filename_label.config(text=f"Data File: {path}")
+
+    # --------------------------------------------------------
+    # PREV/NEXT RECORD
+    # --------------------------------------------------------
+    def prev_record(self):
+        if self.current_record > 0:
+            self.current_record -= 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    def next_record(self):
+        if self.current_record + 1 < self.total_records:
+            self.current_record += 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # JUMP TO RECORD
+    # --------------------------------------------------------
+    def jump_to_record(self):
+        if self.total_records == 0 or self.record_length == 0:
+            return
+
+        try:
+            rec = int(self.jump_entry.get()) - 1
+        except ValueError:
+            return
+
+        if rec < 0:
+            rec = 0
+        if rec >= self.total_records:
+            rec = self.total_records - 1
+
+        self.current_record = rec
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # INSERT RECORD (after current)
+    # --------------------------------------------------------
+    def insert_record(self):
+        if self.record_length <= 0:
+            return
+
+        new_record = b" " * self.record_length
+
+        insert_pos = (self.current_record + 1) * self.record_length
+        self.data[insert_pos:insert_pos] = new_record
+
+        self.total_records = len(self.data) // self.record_length
+
+        self.current_record += 1
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # DELETE RECORD
+    # --------------------------------------------------------
+    def delete_record(self):
+        if self.record_length <= 0 or self.total_records == 0:
+            return
+
+        start = self.current_record * self.record_length
+        end   = start + self.record_length
+
+        del self.data[start:end]
+
+        self.total_records = len(self.data) // self.record_length
+
+        if self.current_record >= self.total_records:
+            self.current_record = max(0, self.total_records - 1)
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # UPDATE RECORD COUNT
+    # --------------------------------------------------------
+    def update_record_count(self):
+        self.record_label.config(
+            text=f"Record {self.current_record + 1} of {self.total_records}"
+        )
+
+    # --------------------------------------------------------
+    # REFRESH VALUES
+    # --------------------------------------------------------
+    def refresh_values(self):
+        self.value_tree.delete(*self.value_tree.get_children())
+        for f in self.layout:
+            val = extract_field_value(
+                self.data,
+                self.record_length,
+                self.current_record,
+                f
+            )
+            self.value_tree.insert("", "end", values=(val,))
+
+    # --------------------------------------------------------
+    # FIELD SELECT
+    # --------------------------------------------------------
+    def on_field_select(self, event):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        val = extract_field_value(
+            self.data,
+            self.record_length,
+            self.current_record,
+            field
+        )
+
+        self.edit_box.delete("1.0", tk.END)
+        self.edit_box.insert("1.0", val)
+
+    # --------------------------------------------------------
+    # APPLY EDIT
+    # --------------------------------------------------------
+    def apply_edit(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        new_text = self.edit_box.get("1.0", tk.END).rstrip("\n")
+
+        start = field["start"] - 1
+        end   = field["end"]
+        length = end - start
+
+        offset = self.current_record * self.record_length + start
+        if offset < 0 or offset + length > len(self.data):
+            return
+
+        encoded = new_text.encode("utf-8", errors="replace")
+
+        if len(encoded) < length:
+            encoded = encoded + b" " * (length - len(encoded))
+        else:
+            encoded = encoded[:length]
+
+        self.data[offset:offset + length] = encoded
+        self.refresh_values()
+
+    # --------------------------------------------------------
+    # CLEAR EDIT BOX
+    # --------------------------------------------------------
+    def clear_edit_box(self):
+        self.edit_box.delete("1.0", tk.END)
+
+    # --------------------------------------------------------
+    # UPDATE RULER
+    # --------------------------------------------------------
+    def update_ruler(self):
+        if self.record_length <= 0:
+            return
+
+        width = min(self.record_length, 200)
+
+        ruler = ""
+        pos = 1
+
+        while len(ruler) < width:
+            if pos % 10 == 0:
+                ruler += str(pos // 10)
+            elif pos % 5 == 0:
+                ruler += "+"
+            else:
+                ruler += "."
+            pos += 1
+
+        self.ruler.config(state="normal")
+        self.ruler.delete("1.0", tk.END)
+        self.ruler.insert("1.0", ruler)
+        self.ruler.config(state="disabled")
+    def get_custom_colors(self, initial_colors=None):
+        """
+        Part 5: Full color picker dialog.
+        Returns a complete theme color dictionary.
+        """
+        return pick_theme_colors(initial_colors)
+
+
+# ------------------------------------------------------------
+# RUN
+# ------------------------------------------------------------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FileAidViewer(root)
+    root.mainloop()

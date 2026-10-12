@@ -1,0 +1,100 @@
+        self.value_tree.configure(yscrollcommand=value_scroll.set)
+
+        self.value_tree.pack(side="left", fill="both", expand=True)
+        value_scroll.pack(side="right", fill="y")
+
+        # --------------------------------------------------------
+        # EDIT BOX + RULER (correct placement)
+        # --------------------------------------------------------
+        bottom = ttk.Frame(frame)
+        bottom.pack(fill="x")
+
+        # Left column: label
+        label_frame = ttk.Frame(bottom)
+        label_frame.pack(side="left", padx=2, anchor="n")
+        ttk.Label(label_frame, text="Edit field value:").pack()
+
+        # Right column: ruler + textbox
+        edit_frame = ttk.Frame(bottom)
+        edit_frame.pack(side="left", fill="x", expand=True)
+
+        # Ruler directly above textbox
+        self.ruler = tk.Text(edit_frame, height=1, font=("Courier New", 10), bd=0)
+        self.ruler.pack(fill="x")
+        self.ruler.config(state="disabled")
+
+        # Make ruler truly non-editable and non-focusable
+        self.ruler.bind("<Key>", lambda e: "break")
+        self.ruler.bind("<Button-1>", lambda e: "break")
+
+        # Textbox
+        self.edit_box = tk.Text(edit_frame, height=3, font=("Courier New", 10))
+        self.edit_box.pack(fill="x", expand=True)
+
+        self.apply_button = ttk.Button(bottom, text="Apply", command=self.apply_edit)
+        self.apply_button.pack(side="left", padx=4)
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_field_select)
+
+        # --------------------------------------------------------
+        # MENU
+        # --------------------------------------------------------
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        filemenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=filemenu)
+       
+        thememenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Theme", menu=thememenu)
+
+        thememenu.add_command(
+            label="Save Theme…",
+            command=lambda: menu_save_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar,
+                color_picker_callback=self.get_custom_colors
+            )
+        )
+
+        thememenu.add_command(
+            label="Load Theme…",
+            command=lambda: menu_load_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar
+            )
+        )
+
+        thememenu.add_command(
+            label="Delete Theme…",
+            command=lambda: menu_delete_theme(self.config)
+        )
+
+        thememenu.add_command(
+            label="Edit Theme…",
+            command=lambda: menu_edit_theme(
+                self.config,
+                self.root,
+                main_tree=self.tree,
+                value_tree=self.value_tree,
+                viewer_widget=self.edit_box,
+                status_label=self.status_label,
+                menubar=menubar,
+                color_picker_callback=self.get_custom_colors
+            )
+        )
+        thememenu.add_command(
+            label="Rename Theme…",
+            command=lambda: menu_rename_theme(self.config)
+        )
+

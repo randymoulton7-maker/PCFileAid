@@ -1,0 +1,499 @@
+import tkinter as tk
+from tkinter import ttk, filedialog
+
+# ------------------------------------------------------------
+# Parse a single .fad layout line (fixed-width columns)
+# ------------------------------------------------------------
+def parse_layout_line(line):
+    if len(line) < 70:
+        return None
+
+    level = line[0:5].strip()
+    name  = line[6:31].strip()
+    pic   = line[31:41].strip()
+    fld   = line[41:46].strip()
+    start = line[46:54].strip()
+    end   = line[54:62].strip()
+
+    if not level.isdigit():
+        return None
+
+    return {
+        "level": int(level),
+        "name": name,
+        "pic": pic,
+        "fld": int(fld) if fld else 0,
+        "start": int(start),
+        "end": int(end)
+    }
+
+# ------------------------------------------------------------
+# Load .fad layout file
+# ------------------------------------------------------------
+def load_layout_file(path):
+    fields = []
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    lines = lines[2:]  # skip header + blank line
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        field = parse_layout_line(line)
+        if field:
+            fields.append(field)
+
+    return fields
+
+# ------------------------------------------------------------
+# Load data file (binary)
+# ------------------------------------------------------------
+def load_data_file(path):
+    with open(path, "rb") as f:
+        data = f.read()
+
+    data = data.replace(b"\r", b"").replace(b"\n", b"")
+    return bytearray(data)
+
+# ------------------------------------------------------------
+# Extract field value from record (UTF‑8/ASCII only)
+# ------------------------------------------------------------
+def extract_field_value(data, record_length, record_index, field):
+    if record_length <= 0:
+        return ""
+
+    start = field["start"] - 1
+    end   = field["end"]
+    length = end - start
+
+    offset = record_index * record_length + start
+    if offset < 0 or offset + length > len(data):
+        return ""
+
+    raw = data[offset:offset + length]
+
+    try:
+        text = raw.decode("utf-8", errors="replace")
+    except Exception:
+        text = raw.decode("latin-1", errors="replace")
+
+    return text.rstrip()
+
+# ------------------------------------------------------------
+# Main UI
+# ------------------------------------------------------------
+class FileAidViewer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("PC FileAid Viewer")
+
+        self.layout = []
+        self.data = bytearray()
+        self.record_length = 0
+        self.current_record = 0
+        self.data_file_path = None
+        self.total_records = 0
+
+        frame = ttk.Frame(root)
+        frame.pack(fill="both", expand=True)
+
+        # --------------------------------------------------------
+        # TOP CONTROLS
+        # --------------------------------------------------------
+        top = ttk.Frame(frame)
+        top.pack(fill="x")
+
+        ttk.Label(top, text="Record:").pack(side="left", padx=2)
+        self.record_entry = ttk.Entry(top, width=6)
+        self.record_entry.pack(side="left")
+        self.record_entry.insert(0, "1")
+
+        self.prev_button = ttk.Button(top, text="Prev", command=self.prev_record)
+        self.prev_button.pack(side="left", padx=2)
+
+        self.next_button = ttk.Button(top, text="Next", command=self.next_record)
+        self.next_button.pack(side="left", padx=2)
+
+        self.record_label = ttk.Label(top, text="Record 0 of 0")
+        self.record_label.pack(side="left", padx=10)
+
+        # --------------------------------------------------------
+        # JUMP-TO-RECORD CONTROLS
+        # --------------------------------------------------------
+        jump_frame = ttk.Frame(top)
+        jump_frame.pack(side="left", padx=20)
+
+        ttk.Label(jump_frame, text="Jump to:").pack(side="left")
+
+        self.jump_entry = ttk.Entry(jump_frame, width=8)
+        self.jump_entry.pack(side="left", padx=2)
+
+        ttk.Button(jump_frame, text="Go", command=self.jump_to_record).pack(side="left")
+
+        # --------------------------------------------------------
+        # SPLIT PANE
+        # --------------------------------------------------------
+        paned = ttk.Panedwindow(frame, orient="horizontal")
+        paned.pack(fill="both", expand=True)
+
+        # LEFT PANE (LAYOUT)
+        left_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=1)
+
+        self.tree = ttk.Treeview(
+            left_frame,
+            columns=("level", "name", "pic", "start", "end"),
+            show="headings"
+        )
+
+        self.tree.heading("level", text="FIELD LEVEL")
+        self.tree.heading("name",  text="FIELD NAME")
+        self.tree.heading("pic",   text="PICTURE")
+        self.tree.heading("start", text="FLD START")
+        self.tree.heading("end",   text="FLD END")
+
+        self.tree.column("level", width=80)
+        self.tree.column("name",  width=220)
+        self.tree.column("pic",   width=100)
+        self.tree.column("start", width=80)
+        self.tree.column("end",   width=80)
+
+        self.tree.tag_configure("group", background="#e0e0ff")
+
+        tree_scroll = ttk.Scrollbar(left_frame, orient="vertical", command=self._scroll_both)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        tree_scroll.pack(side="right", fill="y")
+
+        # RIGHT PANE (VALUES)
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame, weight=1)
+
+        self.value_tree = ttk.Treeview(
+            right_frame,
+            columns=("value",),
+            show="headings"
+        )
+        self.value_tree.heading("value", text="VALUE")
+        self.value_tree.column("value", width=400)
+
+        value_scroll = ttk.Scrollbar(right_frame, orient="vertical", command=self._scroll_both)
+        self.value_tree.configure(yscrollcommand=value_scroll.set)
+
+        self.value_tree.pack(side="left", fill="both", expand=True)
+        value_scroll.pack(side="right", fill="y")
+
+        # --------------------------------------------------------
+        # EDIT BOX
+        # --------------------------------------------------------
+        bottom = ttk.Frame(frame)
+        bottom.pack(fill="x")
+
+        ttk.Label(bottom, text="Edit field value:").pack(side="left", padx=2)
+        self.edit_box = tk.Text(bottom, height=3)
+        self.edit_box.pack(side="left", fill="x", expand=True)
+
+        self.apply_button = ttk.Button(bottom, text="Apply", command=self.apply_edit)
+        self.apply_button.pack(side="left", padx=4)
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_field_select)
+
+        # --------------------------------------------------------
+        # MENU
+        # --------------------------------------------------------
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        filemenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=filemenu)
+
+        filemenu.add_command(label="Open Layout (.fad)", command=self.open_layout)
+        filemenu.add_command(label="Open Data File", command=self.open_data)
+        filemenu.add_command(label="New Data File", command=self.new_data_file)
+        filemenu.add_separator()
+        filemenu.add_command(label="Save Data File", command=self.save_data_file)
+        filemenu.add_command(label="Save Data File As...", command=self.save_data_file_as)
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=self.root.destroy)
+
+        editmenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=editmenu)
+
+        editmenu.add_command(label="Insert Record", command=self.insert_record)
+
+    # --------------------------------------------------------
+    # Scroll sync
+    # --------------------------------------------------------
+    def _scroll_both(self, *args):
+        self.tree.yview(*args)
+        self.value_tree.yview(*args)
+
+    # --------------------------------------------------------
+    # OPEN LAYOUT
+    # --------------------------------------------------------
+    def open_layout(self):
+        path = filedialog.askopenfilename(
+            title="Select .fad Layout File",
+            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.layout = load_layout_file(path)
+        self.tree.delete(*self.tree.get_children())
+        self.value_tree.delete(*self.value_tree.get_children())
+
+        for f in self.layout:
+            tags = ("group",) if f["pic"].upper() == "GROUP" else ()
+            self.tree.insert(
+                "",
+                "end",
+                values=(f["level"], f["name"], f["pic"], f["start"], f["end"]),
+                tags=tags
+            )
+            self.value_tree.insert("", "end", values=(""))
+
+        self.record_length = self.layout[-1]["end"] if self.layout else 0
+        self.current_record = 0
+
+        if self.data and self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # OPEN DATA FILE
+    # --------------------------------------------------------
+    def open_data(self):
+        path = filedialog.askopenfilename(
+            title="Select Data File",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.data_file_path = path
+        self.data = load_data_file(path)
+
+        if self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.current_record = 0
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # NEW DATA FILE
+    # --------------------------------------------------------
+    def new_data_file(self):
+        self.data = bytearray()
+        self.data_file_path = None
+
+        self.current_record = 0
+        self.total_records = 0
+
+        self.value_tree.delete(*self.value_tree.get_children())
+        self.tree.selection_remove(self.tree.selection())
+        self.clear_edit_box()
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE
+    # --------------------------------------------------------
+    def save_data_file(self):
+        if not self.data_file_path:
+            return
+        with open(self.data_file_path, "wb") as f:
+            f.write(self.data)
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE AS
+    # --------------------------------------------------------
+    def save_data_file_as(self):
+        path = filedialog.asksaveasfilename(
+            title="Save Data File As",
+            defaultextension="",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+        with open(path, "wb") as f:
+            f.write(self.data)
+
+    # --------------------------------------------------------
+    # PREV/NEXT RECORD
+    # --------------------------------------------------------
+    def prev_record(self):
+        if self.current_record > 0:
+            self.current_record -= 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    def next_record(self):
+        if self.current_record + 1 < self.total_records:
+            self.current_record += 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # JUMP TO RECORD
+    # --------------------------------------------------------
+    def jump_to_record(self):
+        if self.total_records == 0 or self.record_length == 0:
+            return
+
+        try:
+            rec = int(self.jump_entry.get()) - 1
+        except ValueError:
+            return
+
+        if rec < 0:
+            rec = 0
+        if rec >= self.total_records:
+            rec = self.total_records - 1
+
+        self.current_record = rec
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # INSERT RECORD
+    # --------------------------------------------------------
+    def insert_record(self):
+        if self.record_length <= 0:
+            return
+
+        new_record = b" " * self.record_length
+
+        insert_pos = self.current_record * self.record_length
+        self.data[insert_pos:insert_pos] = new_record
+
+        self.total_records = len(self.data) // self.record_length
+
+        self.current_record += 1
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # UPDATE RECORD COUNT
+    # --------------------------------------------------------
+    def update_record_count(self):
+        self.record_label.config(
+            text=f"Record {self.current_record + 1} of {self.total_records}"
+        )
+
+    # --------------------------------------------------------
+    # REFRESH VALUES
+    # --------------------------------------------------------
+    def refresh_values(self):
+        self.value_tree.delete(*self.value_tree.get_children())
+        for f in self.layout:
+            val = extract_field_value(
+                self.data,
+                self.record_length,
+                self.current_record,
+                f
+            )
+            self.value_tree.insert("", "end", values=(val,))
+
+    # --------------------------------------------------------
+    # FIELD SELECT
+    # --------------------------------------------------------
+    def on_field_select(self, event):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        val = extract_field_value(
+            self.data,
+            self.record_length,
+            self.current_record,
+            field
+        )
+
+        self.edit_box.delete("1.0", tk.END)
+        self.edit_box.insert("1.0", val)
+
+    # --------------------------------------------------------
+    # APPLY EDIT
+    # --------------------------------------------------------
+    def apply_edit(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        new_text = self.edit_box.get("1.0", tk.END).rstrip("\n")
+
+        start = field["start"] - 1
+        end   = field["end"]
+        length = end - start
+
+        offset = self.current_record * self.record_length + start
+        if offset < 0 or offset + length > len(self.data):
+            return
+
+        encoded = new_text.encode("utf-8", errors="replace")
+
+        if len(encoded) < length:
+            encoded = encoded + b" " * (length - len(encoded))
+        else:
+            encoded = encoded[:length]
+
+        self.data[offset:offset + length] = encoded
+        self.refresh_values()
+
+    # --------------------------------------------------------
+    # CLEAR EDIT BOX
+    # --------------------------------------------------------
+    def clear_edit_box(self):
+        self.edit_box.delete("1.0", tk.END)
+
+
+# ------------------------------------------------------------
+# RUN
+# ------------------------------------------------------------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FileAidViewer(root)
+    root.mainloop()

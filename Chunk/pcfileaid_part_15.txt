@@ -1,0 +1,83 @@
+
+        self.edit_box.delete("1.0", tk.END)
+        self.edit_box.insert("1.0", val)
+
+    # --------------------------------------------------------
+    # APPLY EDIT
+    # --------------------------------------------------------
+    def apply_edit(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        new_text = self.edit_box.get("1.0", tk.END).rstrip("\n")
+
+        start = field["start"] - 1
+        end   = field["end"]
+        length = end - start
+
+        offset = self.current_record * self.record_length + start
+        if offset < 0 or offset + length > len(self.data):
+            return
+
+        encoded = new_text.encode("utf-8", errors="replace")
+
+        if len(encoded) < length:
+            encoded = encoded + b" " * (length - len(encoded))
+        else:
+            encoded = encoded[:length]
+
+        self.data[offset:offset + length] = encoded
+        self.refresh_values()
+
+    # --------------------------------------------------------
+    # CLEAR EDIT BOX
+    # --------------------------------------------------------
+    def clear_edit_box(self):
+        self.edit_box.delete("1.0", tk.END)
+
+    # --------------------------------------------------------
+    # UPDATE RULER
+    # --------------------------------------------------------
+    def update_ruler(self):
+        if self.record_length <= 0:
+            return
+
+        width = min(self.record_length, 200)
+
+        ruler = ""
+        pos = 1
+
+        while len(ruler) < width:
+            if pos % 10 == 0:
+                ruler += str(pos // 10)
+            elif pos % 5 == 0:
+                ruler += "+"
+            else:
+                ruler += "."
+            pos += 1
+
+        self.ruler.config(state="normal")
+        self.ruler.delete("1.0", tk.END)
+        self.ruler.insert("1.0", ruler)
+        self.ruler.config(state="disabled")
+    def get_custom_colors(self, initial_colors=None):
+        """
+        Part 5: Full color picker dialog.
+        Returns a complete theme color dictionary.
+        """
+        return pick_theme_colors(initial_colors)
+
+
+# ------------------------------------------------------------
+# RUN
+# ------------------------------------------------------------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FileAidViewer(root)
+    root.mainloop()

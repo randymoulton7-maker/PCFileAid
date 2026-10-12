@@ -1,0 +1,100 @@
+        self.tree.selection_remove(self.tree.selection())
+        self.clear_edit_box()
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+
+        self.filename_label.config(text="New data file (unsaved)")
+        self.update_ruler()
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE
+    # --------------------------------------------------------
+    def save_data_file(self):
+        if not self.data_file_path:
+            return
+
+        if self.record_length <= 0:
+            return
+
+        total = len(self.data) // self.record_length
+        output = []
+
+        for rec in range(total):
+            start = rec * self.record_length
+            end = start + self.record_length
+            output.append(self.data[start:end])
+
+        # Insert CRLF between records
+        final_bytes = b"\r\n".join(output)
+
+        with open(self.data_file_path, "wb") as f:
+            f.write(final_bytes)
+
+    # --------------------------------------------------------
+    # SAVE DATA FILE AS
+    # --------------------------------------------------------
+    def save_data_file_as(self):
+        path = filedialog.asksaveasfilename(
+            title="Save Data File As",
+            defaultextension="",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        if self.record_length <= 0:
+            return
+
+        total = len(self.data) // self.record_length
+        output = []
+
+        for rec in range(total):
+            start = rec * self.record_length
+            end = start + self.record_length
+            output.append(self.data[start:end])
+
+        final_bytes = b"\r\n".join(output)
+
+        with open(path, "wb") as f:
+            f.write(final_bytes)
+
+        self.data_file_path = path
+        self.filename_label.config(text=f"Data File: {path}")
+
+    # --------------------------------------------------------
+    # PREV/NEXT RECORD
+    # --------------------------------------------------------
+    def prev_record(self):
+        if self.current_record > 0:
+            self.current_record -= 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    def next_record(self):
+        if self.current_record + 1 < self.total_records:
+            self.current_record += 1
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # JUMP TO RECORD
+    # --------------------------------------------------------
+    def jump_to_record(self):
+        if self.total_records == 0 or self.record_length == 0:
+            return
+
+        try:
+            rec = int(self.jump_entry.get()) - 1
+        except ValueError:
+            return
+
+        if rec < 0:
+            rec = 0

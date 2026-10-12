@@ -1,0 +1,100 @@
+    try:
+        # Create ttk styles for top controls
+        style.configure("Top.TFrame", background=bg)
+        style.configure("Top.TLabel", background=bg, foreground=fg)
+        style.configure("Top.TEntry", fieldbackground=bg, foreground=fg)
+        style.configure("Top.TButton", background=bg, foreground=fg)
+
+        # Global option overrides (helps ttk behave consistently)
+        root.option_add("*TFrame*Background", bg)
+        root.option_add("*TLabel*Background", bg)
+        root.option_add("*TLabel*Foreground", fg)
+        root.option_add("*TEntry*FieldBackground", bg)
+        root.option_add("*TEntry*Foreground", fg)
+        root.option_add("*TButton*Background", bg)
+        root.option_add("*TButton*Foreground", fg)
+
+    except Exception:
+        pass
+
+    # Treeview styling
+    style.configure("Treeview",
+                    background=row1,
+                    fieldbackground=row1,
+                    foreground=fg)
+    style.map("Treeview",
+              background=[("selected", sel)],
+              foreground=[("selected", fg)])
+
+    # Alternate row tags for main_tree
+    if main_tree is not None:
+        try:
+            main_tree.tag_configure("evenrow", background=row1, foreground=fg)
+            main_tree.tag_configure("oddrow", background=row2, foreground=fg)
+            main_tree.tag_configure("group", background=group_bg, foreground=fg)
+        except Exception:
+            pass
+
+    # Alternate row tags for value_tree
+    if value_tree is not None:
+        try:
+            value_tree.tag_configure("evenrow", background=row1, foreground=fg)
+            value_tree.tag_configure("oddrow", background=row2, foreground=fg)
+        except Exception:
+            pass
+
+    # PIC type color can be used by any widget that highlights PIC fields;
+    # here we just expose it for future use.
+    # No direct widget binding is enforced in Part 3.
+
+
+def apply_active_theme(cfg,
+                       root,
+                       main_tree=None,
+                       value_tree=None,
+                       viewer_widget=None,
+                       status_label=None,
+                       menubar=None):
+    """
+    Enforce the active theme at runtime.
+    Behavior:
+      - Reads cfg["active_theme"]
+      - Retrieves theme from cfg["themes"]
+      - Applies theme immediately via apply_theme_to_style
+    """
+    active_name = cfg.get("active_theme")
+    if not active_name:
+        return
+
+    theme = get_theme(cfg, active_name)
+    if not theme:
+        return
+
+    apply_theme_to_style(root,
+                         theme,
+                         main_tree=main_tree,
+                         value_tree=value_tree,
+                         viewer_widget=viewer_widget,
+                         status_label=status_label,
+                         menubar=menubar)
+
+
+def apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=None,
+                               value_tree=None,
+                               viewer_widget=None,
+                               status_label=None,
+                               menubar=None):
+    """
+    Integrate theme application with the existing config system.
+    Behavior:
+      - Set cfg["active_theme"] via set_active_theme
+      - Save configuration
+      - Apply theme immediately
+    """
+    theme = get_theme(cfg, name)
+    if not theme:
+        return
+

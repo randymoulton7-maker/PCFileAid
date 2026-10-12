@@ -1,0 +1,100 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, simpledialog, messagebox
+from tkinter import colorchooser
+
+# ------------------------------------------------------------
+# NEW: Tiny JSON config system (safe, add-only)
+# ------------------------------------------------------------
+import json
+import os
+
+CONFIG_FILENAME = "pcfileaid_config.json"
+
+def load_config():
+    """Load configuration from JSON file stored in same folder as pcfileaid.py."""
+    if not os.path.exists(CONFIG_FILENAME):
+        return {
+            "themes": {},
+            "active_theme": None,
+            "theme_names": []
+        }
+    try:
+        with open(CONFIG_FILENAME, "r") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+        
+    # Ensure required keys exist
+    cfg.setdefault("themes", {})
+    cfg.setdefault("active_theme", None)
+    cfg.setdefault("theme_names", list(cfg["themes"].keys()))
+    return cfg
+# ------------------------------------------------------------
+# Part 2: Theme Storage Logic (Add-only implementation)
+# ------------------------------------------------------------
+
+def add_theme(cfg, theme_dict):
+    """
+    Add a new theme or update an existing one.
+    Behavior:
+      - Insert or replace theme in cfg["themes"]
+      - Ensure theme name exists in cfg["theme_names"]
+      - Save configuration immediately
+    """
+    name = theme_dict.get("name")
+    if not name:
+        return
+
+    # Add or update theme dictionary
+    cfg["themes"][name] = theme_dict
+
+    # Ensure theme name is in the list
+    if name not in cfg["theme_names"]:
+        cfg["theme_names"].append(name)
+
+    # Persist change
+    save_config(cfg)
+
+
+def delete_theme(cfg, name):
+    """
+    Delete a theme from configuration.
+    Behavior:
+      - Remove from cfg["themes"]
+      - Remove from cfg["theme_names"]
+      - Clear active_theme if necessary
+      - Save configuration immediately
+    """
+    if name in cfg["themes"]:
+        del cfg["themes"][name]
+
+    if name in cfg["theme_names"]:
+        cfg["theme_names"].remove(name)
+
+    if cfg.get("active_theme") == name:
+        cfg["active_theme"] = None
+
+    save_config(cfg)
+
+
+def get_theme(cfg, name):
+    """
+    Retrieve a theme dictionary by name.
+    Behavior:
+      - Validate theme name
+      - Return theme dictionary or None
+    """
+    return cfg.get("themes", {}).get(name)
+
+
+def set_active_theme(cfg, name):
+    """
+    Set the active theme.
+    Behavior:
+      - Update cfg["active_theme"]
+      - Save configuration immediately
+    """
+    if name in cfg.get("themes", {}):
+        cfg["active_theme"] = name
+        save_config(cfg)
+

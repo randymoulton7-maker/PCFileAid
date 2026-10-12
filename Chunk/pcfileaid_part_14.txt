@@ -1,0 +1,100 @@
+        if rec >= self.total_records:
+            rec = self.total_records - 1
+
+        self.current_record = rec
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # INSERT RECORD (after current)
+    # --------------------------------------------------------
+    def insert_record(self):
+        if self.record_length <= 0:
+            return
+
+        new_record = b" " * self.record_length
+
+        insert_pos = (self.current_record + 1) * self.record_length
+        self.data[insert_pos:insert_pos] = new_record
+
+        self.total_records = len(self.data) // self.record_length
+
+        self.current_record += 1
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # DELETE RECORD
+    # --------------------------------------------------------
+    def delete_record(self):
+        if self.record_length <= 0 or self.total_records == 0:
+            return
+
+        start = self.current_record * self.record_length
+        end   = start + self.record_length
+
+        del self.data[start:end]
+
+        self.total_records = len(self.data) // self.record_length
+
+        if self.current_record >= self.total_records:
+            self.current_record = max(0, self.total_records - 1)
+
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, str(self.current_record + 1))
+
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # UPDATE RECORD COUNT
+    # --------------------------------------------------------
+    def update_record_count(self):
+        self.record_label.config(
+            text=f"Record {self.current_record + 1} of {self.total_records}"
+        )
+
+    # --------------------------------------------------------
+    # REFRESH VALUES
+    # --------------------------------------------------------
+    def refresh_values(self):
+        self.value_tree.delete(*self.value_tree.get_children())
+        for f in self.layout:
+            val = extract_field_value(
+                self.data,
+                self.record_length,
+                self.current_record,
+                f
+            )
+            self.value_tree.insert("", "end", values=(val,))
+
+    # --------------------------------------------------------
+    # FIELD SELECT
+    # --------------------------------------------------------
+    def on_field_select(self, event):
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        index = self.tree.index(sel[0])
+        if index >= len(self.layout):
+            return
+
+        field = self.layout[index]
+        val = extract_field_value(
+            self.data,
+            self.record_length,
+            self.current_record,
+            field
+        )

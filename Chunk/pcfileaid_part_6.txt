@@ -1,0 +1,100 @@
+# Load .fad layout file
+# ------------------------------------------------------------
+def load_layout_file(path):
+    fields = []
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    lines = lines[2:]  # skip header + blank line
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        field = parse_layout_line(line)
+        if field:
+            fields.append(field)
+
+    return fields
+
+# ------------------------------------------------------------
+# Load data file (binary)
+# ------------------------------------------------------------
+def load_data_file(path):
+    with open(path, "rb") as f:
+        data = f.read()
+
+    data = data.replace(b"\r", b"").replace(b"\n", b"")
+    return bytearray(data)
+
+# ------------------------------------------------------------
+# Extract field value from record
+# ------------------------------------------------------------
+def extract_field_value(data, record_length, record_index, field):
+    if record_length <= 0:
+        return ""
+
+    start = field["start"] - 1
+    end   = field["end"]
+    length = end - start
+
+    offset = record_index * record_length + start
+    if offset < 0 or offset + length > len(data):
+        return ""
+
+    raw = data[offset:offset + length]
+
+    try:
+        text = raw.decode("utf-8", errors="replace")
+    except Exception:
+        text = raw.decode("latin-1", errors="replace")
+
+    return text.rstrip()
+def rename_theme(cfg, old_name, new_name):
+    """
+    Rename a theme without deleting or recreating it.
+    Add‑only. No restructuring.
+    """
+    # Move theme dictionary
+    cfg["themes"][new_name] = cfg["themes"].pop(old_name)
+
+    # Update theme_names list
+    try:
+        idx = cfg["theme_names"].index(old_name)
+        cfg["theme_names"][idx] = new_name
+    except ValueError:
+        pass
+
+    # Update active theme if needed
+    if cfg.get("active_theme") == old_name:
+        cfg["active_theme"] = new_name
+
+    # Save config
+    save_config(cfg)
+
+def menu_rename_theme(cfg):
+    """
+    UI dialog to rename an existing theme.
+    Add‑only. No restructuring.
+    """
+    import tkinter.simpledialog as sd
+    import tkinter.messagebox as mb
+
+    # Pick old theme name
+    old_name = sd.askstring("Rename Theme", "Enter the CURRENT theme name:")
+    if not old_name:
+        return
+
+    if old_name not in cfg.get("themes", {}):
+        mb.showerror("Rename Theme", f"Theme '{old_name}' does not exist.")
+        return
+
+    # Pick new theme name
+    new_name = sd.askstring("Rename Theme", "Enter the NEW theme name:")
+    if not new_name:
+        return
+
+    if new_name in cfg.get("themes", {}):
+        mb.showerror("Rename Theme", f"Theme '{new_name}' already exists.")
+        return

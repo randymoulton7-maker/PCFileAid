@@ -1,0 +1,100 @@
+
+def list_themes(cfg):
+    """
+    Return list of available theme names.
+    """
+    return cfg.get("theme_names", [])
+
+
+def validate_theme(theme_dict):
+    """
+    Validate theme dictionary structure.
+    Behavior:
+      - Must contain 'name'
+      - Must contain 'colors'
+      - 'colors' must be a dictionary
+    """
+    if not isinstance(theme_dict, dict):
+        return False
+    if "name" not in theme_dict:
+        return False
+    if "colors" not in theme_dict:
+        return False
+    if not isinstance(theme_dict["colors"], dict):
+        return False
+    return True
+
+def save_config(cfg):
+    """Save configuration to JSON file."""
+    try:
+        with open(CONFIG_FILENAME, "w") as f:
+            json.dump(cfg, f, indent=4)
+    except Exception as e:
+        print("Error saving config:", e)
+# ------------------------------------------------------------
+# Part 3: Theme Application (Add-only implementation)
+# ------------------------------------------------------------
+
+def apply_theme_to_style(root,
+                         theme_dict,
+                         main_tree=None,
+                         value_tree=None,
+                         viewer_widget=None,
+                         status_label=None,
+                         menubar=None):
+    """
+    Apply a theme dictionary to ttk.Style and key UI widgets.
+    Behavior:
+      - Uses theme_dict["colors"] for all color values
+      - Updates root, menus, Treeviews, and viewer
+      - Works immediately without restart
+    """
+    if not theme_dict:
+        return
+
+    colors = theme_dict.get("colors", {})
+    bg = colors.get("background_color", "#202020")
+    fg = colors.get("text_color", "#FFFFFF")
+    sel = colors.get("selection_color", "#FFCC00")
+    row1 = colors.get("treeview_row_color_1", "#1E1E1E")
+    row2 = colors.get("treeview_row_color_2", "#252525")
+    group_bg = colors.get("group_shading_color", "#e0e0ff")
+    pic_color = colors.get("pic_type_color", "#66CCFF")
+    menu_bg = colors.get("menu_background_color", bg)
+    status_bg = colors.get("status_background_color", bg)
+
+    style = ttk.Style(root)
+
+    # Root background
+    try:
+        root.configure(bg=bg)
+    except Exception:
+        pass
+
+    # Menubar (if provided)
+    if menubar is not None:
+        try:
+            menubar.configure(bg=menu_bg)
+        except Exception:
+            pass
+        try:
+            root.config(menu=menubar)
+        except Exception:
+            pass
+
+    # Status bar
+    if status_label is not None:
+        try:
+            status_label.configure(bg=status_bg, fg=fg)
+        except Exception:
+            pass
+
+    # Viewer widget (e.g., Text)
+    if viewer_widget is not None:
+        try:
+            viewer_widget.configure(bg=bg, fg=fg, insertbackground=fg)
+        except Exception:
+            pass
+    # ------------------------------------------------------------
+    # Part 6: Apply theme to top controls (ttk widgets)
+    # ------------------------------------------------------------

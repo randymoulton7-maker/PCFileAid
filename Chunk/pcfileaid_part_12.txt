@@ -1,0 +1,100 @@
+        filemenu.add_command(label="Open Layout (.fad)", command=self.open_layout)
+        filemenu.add_command(label="Open Data File", command=self.open_data)
+        filemenu.add_command(label="New Data File", command=self.new_data_file)
+        filemenu.add_separator()
+        filemenu.add_command(label="Save Data File", command=self.save_data_file)
+        filemenu.add_command(label="Save Data File As...", command=self.save_data_file_as)
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=self.root.destroy)
+
+        editmenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=editmenu)
+
+        editmenu.add_command(label="Insert Record", command=self.insert_record)
+        editmenu.add_command(label="Delete Record", command=self.delete_record)
+        editmenu.add_command(label="Find...", command=self.find_value)
+
+    # --------------------------------------------------------
+    # Scroll sync
+    # --------------------------------------------------------
+    def _scroll_both(self, *args):
+        self.tree.yview(*args)
+        self.value_tree.yview(*args)
+
+    # --------------------------------------------------------
+    # OPEN LAYOUT
+    # --------------------------------------------------------
+    def open_layout(self):
+        path = filedialog.askopenfilename(
+            title="Select .fad Layout File",
+            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.layout = load_layout_file(path)
+        self.tree.delete(*self.tree.get_children())
+        self.value_tree.delete(*self.value_tree.get_children())
+
+        for f in self.layout:
+            tags = ("group",) if f["pic"].upper() == "GROUP" else ()
+            self.tree.insert(
+                "",
+                "end",
+                values=(f["level"], f["name"], f["pic"], f["start"], f["end"]),
+                tags=tags
+            )
+            self.value_tree.insert("", "end", values=(""))
+
+        self.record_length = self.layout[-1]["end"] if self.layout else 0
+        self.current_record = 0
+
+        if self.data and self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.update_ruler()
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # OPEN DATA FILE
+    # --------------------------------------------------------
+    def open_data(self):
+        path = filedialog.askopenfilename(
+            title="Select Data File",
+            filetypes=[("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self.data_file_path = path
+        self.data = load_data_file(path)
+
+        self.filename_label.config(text=f"Data File: {path}")
+
+        if self.record_length > 0:
+            self.total_records = len(self.data) // self.record_length
+        else:
+            self.total_records = 0
+
+        self.current_record = 0
+        self.record_entry.delete(0, tk.END)
+        self.record_entry.insert(0, "1")
+        self.update_record_count()
+        self.refresh_values()
+        self.clear_edit_box()
+
+    # --------------------------------------------------------
+    # NEW DATA FILE
+    # --------------------------------------------------------
+    def new_data_file(self):
+        self.data = bytearray()
+        self.data_file_path = None
+
+        self.current_record = 0
+        self.total_records = 0
+
+        self.value_tree.delete(*self.value_tree.get_children())

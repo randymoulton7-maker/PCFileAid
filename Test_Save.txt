@@ -1,0 +1,8 @@
+TAX CODE Party?678900001    LNFRMTA11120025ABC    1 000006                    00250001SVC      T4 T4ARL1RL2
+record 2                                                                                                   
+  
+  
+stuff               00001234                                                                       
+    
+    
+Fourth Record       00001234                                                                   

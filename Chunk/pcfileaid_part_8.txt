@@ -1,0 +1,100 @@
+    # --------------------------------------------------------
+    # Theme handling
+    # --------------------------------------------------------
+    def apply_custom_theme(self, bg, fg, tree_bg, tree_fg, select_bg):
+        style = ttk.Style()
+
+        # General widget colors
+        style.configure(".", background=bg, foreground=fg)
+
+        # Treeview colors
+        style.configure(
+            "Treeview",
+            background=tree_bg,
+            fieldbackground=tree_bg,
+            foreground=tree_fg,
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", select_bg)],
+            foreground=[("selected", tree_fg)],
+        )
+
+        # Text widget
+        try:
+            self.edit_box.configure(bg=bg, fg=fg, insertbackground=fg)
+        except Exception:
+            pass
+
+        # Status bar
+        try:
+            self.status_label.configure(bg=bg, fg=fg)
+        except Exception:
+            pass
+        
+        # Root window
+        try:
+            self.root.configure(bg=bg)
+        except Exception:
+            pass       
+
+        # Update ALL frames, labels, and buttons automatically
+        for widget in self.root.winfo_children():
+            try:
+                widget.configure(bg=bg)
+            except:
+                pass
+
+            for child in widget.winfo_children():
+                try:
+                    child.configure(bg=bg, fg=fg)
+                except:
+                    pass    
+
+        style.configure("Custom.TFrame", background=bg)
+
+        # Update buttons
+        style.configure("TButton", background=bg, foreground=fg)
+
+        # Update labels
+        style.configure("TLabel", background=bg, foreground=fg)
+
+    def set_dark_gray_theme(self):
+        self.apply_custom_theme(
+            bg="#202020",
+            fg="#e0e0e0",
+            tree_bg="#303030",
+            tree_fg="#e0e0e0",
+            select_bg="#505050",
+        )
+
+    def set_dark_blue_theme(self):
+        self.apply_custom_theme(
+            bg="#101820",
+            fg="#e0f0ff",
+            tree_bg="#182030",
+            tree_fg="#e0f0ff",
+            select_bg="#305080",
+        )
+    def set_light_theme(self):
+        self.apply_custom_theme(
+            bg="#f0f0f0",
+            fg="#000000",
+            tree_bg="#ffffff",
+            tree_fg="#000000",
+            select_bg="#c0c0ff",
+        )
+    def set_light_blue_theme(self):
+        self.apply_custom_theme(
+            bg="#e6f0ff",        # very light blue background
+            fg="#000000",        # black text
+            tree_bg="#d0e0ff",   # light blue tree background
+            tree_fg="#000000",   # black tree text
+            select_bg="#a0b8ff", # medium blue selection
+        )
+
+
+    def set_blackout_theme(self):
+        self.apply_custom_theme(
+            bg="#000000",
+            fg="#ffffff",

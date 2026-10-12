@@ -1,0 +1,100 @@
+            tree_bg="#101010",
+            tree_fg="#ffffff",
+            select_bg="#404040",
+        )
+
+    def pick_custom_theme(self):
+        bg_color = colorchooser.askcolor(title="Background color")[1]
+        if not bg_color:
+            return
+        fg_color = colorchooser.askcolor(title="Foreground color")[1]
+        if not fg_color:
+            return
+        tree_bg = colorchooser.askcolor(title="Tree background")[1]
+        if not tree_bg:
+            return
+        tree_fg = colorchooser.askcolor(title="Tree foreground")[1]
+        if not tree_fg:
+            return
+        select_bg = colorchooser.askcolor(title="Selection background")[1]
+        if not select_bg:
+            return
+
+        self.apply_custom_theme(
+            bg=bg_color,
+            fg=fg_color,
+            tree_bg=tree_bg,
+            tree_fg=tree_fg,
+            select_bg=select_bg,
+        )
+
+    def perform_find(self, search_text):
+        if not search_text or self.record_length <= 0 or not self.layout:
+            return
+
+        search_text_lower = search_text.lower()
+
+        # Search from current record forward, then wrap
+        start_rec = self.current_record
+        total = self.total_records
+
+        for i in range(total):
+            rec = (start_rec + i) % total
+
+            # Check each field in the record
+            for f in self.layout:
+                val = extract_field_value(self.data, self.record_length, rec, f)
+                if search_text_lower in val.lower():
+                    # Found match
+                    self.current_record = rec
+
+                    # Update UI
+                    self.record_entry.delete(0, tk.END)
+                    self.record_entry.insert(0, str(rec + 1))
+                    self.update_record_count()
+                    self.refresh_values()
+
+                    # Select the field in the left tree
+                    idx = self.layout.index(f)
+                    item = self.tree.get_children()[idx]
+                    self.tree.selection_set(item)
+                    self.tree.see(item)
+
+                    # Load into edit box
+                    self.edit_box.delete("1.0", tk.END)
+                    self.edit_box.insert("1.0", val)
+
+                    return
+
+        # If nothing found
+        tk.messagebox.showinfo("Find", f"'{search_text}' not found.")
+
+    def find_value(self):
+        win = tk.Toplevel(self.root)
+        win.title("Find")
+        win.geometry("300x120")
+        win.resizable(False, False)
+
+        ttk.Label(win, text="Find text:").pack(pady=5)
+
+        entry = ttk.Entry(win, width=30)
+        entry.pack(pady=5)
+        entry.focus()
+
+        def do_find():
+            text = entry.get()
+            win.destroy()
+            self.perform_find(text)
+
+        ttk.Button(win, text="Find", command=do_find).pack(pady=5)
+
+    def __init__(self, root):
+        self.root = root
+        self.config = load_config()
+        self.status_label = tk.Label(self.root, text="", anchor="w")
+        self.status_label.pack(fill="x", side="bottom")
+
+        self.root.title("PC FileAid Viewer")
+
+        self.layout = []
+        self.data = bytearray()

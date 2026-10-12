@@ -1,0 +1,100 @@
+        self.record_length = 0
+        self.current_record = 0
+        self.data_file_path = None
+        self.total_records = 0
+
+        frame = ttk.Frame(root)
+        frame.pack(fill="both", expand=True)
+
+        # --------------------------------------------------------
+        # TOP CONTROLS
+        # --------------------------------------------------------
+        top = ttk.Frame(frame, style="Top.TFrame")
+        top.pack(fill="x")
+
+        ttk.Label(top, text="Record:", style="Top.TLabel").pack(side="left", padx=2)
+
+        self.record_entry = ttk.Entry(top, width=6, style="Top.TEntry")
+        self.record_entry.pack(side="left")
+        self.record_entry.insert(0, "1")
+
+        self.prev_button = ttk.Button(top, text="Prev",
+                                      command=self.prev_record,
+                                      style="Top.TButton")
+        self.prev_button.pack(side="left", padx=2)
+
+        self.next_button = ttk.Button(top, text="Next",
+                                      command=self.next_record,
+                                      style="Top.TButton")
+        self.next_button.pack(side="left", padx=2)
+
+        self.record_label = ttk.Label(top, text="Record 0 of 0", style="Top.TLabel")
+        self.record_label.pack(side="left", padx=10)
+
+        # Data file name display
+        self.filename_label = ttk.Label(top, text="No data file loaded", style="Top.TLabel")
+        self.filename_label.pack(side="right", padx=10)
+
+
+        # --------------------------------------------------------
+        # JUMP-TO-RECORD CONTROLS
+        # --------------------------------------------------------
+        jump_frame = ttk.Frame(top)
+        jump_frame.pack(side="left", padx=20)
+
+        ttk.Label(jump_frame, text="Jump to:").pack(side="left")
+
+        self.jump_entry = ttk.Entry(jump_frame, width=8)
+        self.jump_entry.pack(side="left", padx=2)
+
+        ttk.Button(jump_frame, text="Go", command=self.jump_to_record).pack(side="left")
+
+        # --------------------------------------------------------
+        # SPLIT PANE
+        # --------------------------------------------------------
+        paned = ttk.Panedwindow(frame, orient="horizontal")
+        paned.pack(fill="both", expand=True)
+
+        # LEFT PANE (LAYOUT)
+        left_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=1)
+
+        self.tree = ttk.Treeview(
+            left_frame,
+            columns=("level", "name", "pic", "start", "end"),
+            show="headings"
+        )
+
+        self.tree.heading("level", text="FIELD LEVEL")
+        self.tree.heading("name",  text="FIELD NAME")
+        self.tree.heading("pic",   text="PICTURE")
+        self.tree.heading("start", text="FLD START")
+        self.tree.heading("end",   text="FLD END")
+
+        self.tree.column("level", width=80)
+        self.tree.column("name",  width=220)
+        self.tree.column("pic",   width=100)
+        self.tree.column("start", width=80)
+        self.tree.column("end",   width=80)
+
+        self.tree.tag_configure("group", background="#e0e0ff")
+
+        tree_scroll = ttk.Scrollbar(left_frame, orient="vertical", command=self._scroll_both)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        tree_scroll.pack(side="right", fill="y")
+
+        # RIGHT PANE (VALUES)
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame, weight=1)
+
+        self.value_tree = ttk.Treeview(
+            right_frame,
+            columns=("value",),
+            show="headings"
+        )
+        self.value_tree.heading("value", text="VALUE")
+        self.value_tree.column("value", width=400)
+
+        value_scroll = ttk.Scrollbar(right_frame, orient="vertical", command=self._scroll_both)

@@ -1,0 +1,100 @@
+    # Update active theme in config and persist
+    set_active_theme(cfg, name)
+
+    # Apply theme to UI
+    apply_theme_to_style(root,
+                         theme,
+                         main_tree=main_tree,
+                         value_tree=value_tree,
+                         viewer_widget=viewer_widget,
+                         status_label=status_label,
+                         menubar=menubar)
+# ------------------------------------------------------------
+# Part 4: Theme Menu Integration (Add-only implementation)
+# ------------------------------------------------------------
+
+def menu_save_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None,
+                    color_picker_callback=None):
+    """
+    Save Theme…
+    Behavior:
+      - Use color_picker_callback() to get a color dictionary
+      - Ask user for theme name
+      - Add or update theme via Part 2 add_theme()
+      - Apply theme immediately via Part 3 apply_and_set_active_theme()
+    """
+    if color_picker_callback is None:
+        messagebox.showerror("Save Theme", "No color picker available.")
+        return
+
+    colors = color_picker_callback()
+    if not colors:
+        messagebox.showwarning("Save Theme", "No colors selected.")
+        return
+
+    name = simpledialog.askstring("Save Theme", "Enter theme name:")
+    if not name:
+        return
+
+    theme_dict = {"name": name, "colors": colors}
+
+    if not validate_theme(theme_dict):
+        messagebox.showerror("Save Theme", "Invalid theme data.")
+        return
+
+    add_theme(cfg, theme_dict)
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+
+def menu_load_theme(cfg, root,
+                    main_tree=None,
+                    value_tree=None,
+                    viewer_widget=None,
+                    status_label=None,
+                    menubar=None):
+    """
+    Load Theme…
+    Behavior:
+      - Show list of theme names
+      - Ask user for theme name
+      - Retrieve theme via Part 2 get_theme()
+      - Apply theme immediately via Part 3 apply_and_set_active_theme()
+    """
+    names = list_themes(cfg)
+    if not names:
+        messagebox.showinfo("Load Theme", "No themes available.")
+        return
+
+    name = simpledialog.askstring("Load Theme",
+                                  "Available themes:\n" + "\n".join(names))
+    if not name or name not in names:
+        return
+
+    apply_and_set_active_theme(cfg,
+                               name,
+                               root,
+                               main_tree=main_tree,
+                               value_tree=value_tree,
+                               viewer_widget=viewer_widget,
+                               status_label=status_label,
+                               menubar=menubar)
+
+
+def menu_delete_theme(cfg):
+    """
+    Delete Theme…
+    Behavior:
+      - Show list of theme names
