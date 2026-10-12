@@ -1,4 +1,3 @@
-PCFileAid
 PCFileAid is a Python-based utility designed to help mainframe developers, analysts, and support engineers work efficiently with copybooks, fixed‑width layouts, and EBCDIC-derived data files. It provides a simple, operator‑style interface for parsing, inspecting, and converting structured data used in z/OS environments.
 Overview
 PCFileAid is built to replicate and modernize common mainframe file inspection workflows on a Windows workstation. It supports:
