@@ -1,16 +1,23 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog, messagebox
 from tkinter import colorchooser
+from copybook_to_layout import CopybookToLayout
 
 # ------------------------------------------------------------
 # NEW: Theme model + config store (cleaner, maintainable design)
 # ------------------------------------------------------------
 import json
 import os
+import glob
 from dataclasses import dataclass, field
 
 CONFIG_FILENAME = "pcfileaid_config.json"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_FILENAME)
+APP_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+LAYOUT_DIR = os.path.join(APP_DIRECTORY, "Fad_files")
+KEY_DEFINITION_CONFIG_FILE = os.path.join(
+    APP_DIRECTORY, "record_type_config.json"
+)
 DEFAULT_THEME_NAME = "Dark Gray"
 
 
@@ -28,6 +35,31 @@ def _contrast_text_color(background_hex, fallback_hex="#FFFFFF"):
         return fallback_hex
     luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
     return "#FFFFFF" if luminance < 140 else "#000000"
+
+
+def apply_widget_theme(widget, bg, fg, select_bg=None, select_fg=None):
+    if widget is None:
+        return
+    try:
+        widget.configure(bg=bg, fg=fg, insertbackground=fg)
+    except Exception:
+        pass
+
+    if select_bg is not None or select_fg is not None:
+        try:
+            widget.configure(selectbackground=select_bg or bg, selectforeground=select_fg or fg)
+        except Exception:
+            pass
+
+
+def apply_menu_theme(menu, bg, fg, select_bg, select_fg):
+    if menu is None:
+        return
+    try:
+        menu.configure(bg=bg, fg=fg, activebackground=select_bg, activeforeground=select_fg,
+                       selectcolor=select_fg, relief="flat", bd=0)
+    except Exception:
+        pass
 
 
 @dataclass
@@ -224,24 +256,27 @@ class ThemeManager:
                 pass
 
         if viewer_widget is not None:
-            try:
-                viewer_widget.configure(bg=bg, fg=fg, insertbackground=fg)
-            except Exception:
-                pass
+            apply_widget_theme(viewer_widget, bg, fg, sel, accent_text)
 
         try:
             style.configure("TFrame", background=bg)
+            style.configure("Layout.TLabel", background=bg, foreground=fg, padding=(8, 4), font=("TkDefaultFont", 9, "bold"))
             style.configure("TLabel", background=bg, foreground=fg)
-            style.configure("TEntry", fieldbackground=bg, foreground=fg)
-            style.configure("TButton", background=bg, foreground=fg)
+            style.configure("TEntry", fieldbackground=row1, foreground=fg, padding=(4, 2))
+            style.configure("TButton", background=bg, foreground=fg, padding=(8, 4))
             style.map("TButton", background=[("active", accent), ("pressed", accent), ("!disabled", bg)], foreground=[("active", accent_text), ("pressed", accent_text), ("!disabled", fg)])
+            style.configure("TCombobox", fieldbackground=row1, foreground=fg, background=bg)
+            style.map("TCombobox", fieldbackground=[("readonly", row1), ("disabled", row1)], foreground=[("disabled", fg), ("!disabled", fg)], selectbackground=[("readonly", sel)], selectforeground=[("readonly", accent_text)])
             style.configure("Top.TFrame", background=bg)
-            style.configure("Top.TLabel", background=bg, foreground=fg)
-            style.configure("Top.TEntry", fieldbackground=bg, foreground=fg)
-            style.configure("Top.TButton", background=bg, foreground=fg)
+            style.configure("Top.TLabel", background=bg, foreground=fg, font=("TkDefaultFont", 9, "bold"))
+            style.configure("Top.TEntry", fieldbackground=row1, foreground=fg, padding=(4, 2))
+            style.configure("Top.TButton", background=bg, foreground=fg, padding=(7, 4))
             style.map("Top.TButton", background=[("active", accent), ("pressed", accent), ("!disabled", bg)], foreground=[("active", accent_text), ("pressed", accent_text), ("!disabled", fg)])
-            style.configure("Treeview.Heading", background=bg, foreground=fg, relief="flat", padding=(6, 4))
-            style.map("Treeview.Heading", background=[("active", accent), ("pressed", accent)], foreground=[("active", accent_text), ("pressed", accent_text)])
+            style.configure("Treeview.Heading", background=bg, foreground=fg, relief="flat", padding=(8, 6), font=("TkDefaultFont", 9, "bold"))
+            style.map("Treeview.Heading", background=[("active", sel), ("pressed", sel)], foreground=[("active", accent_text), ("pressed", accent_text)])
+            style.configure("Panel.TFrame", background=row1)
+            style.configure("PanelBorder.TFrame", background=bg)
+            style.configure("Meta.TLabel", background=bg, foreground=fg, padding=(0, 2))
 
             root.option_add("*TFrame*Background", bg)
             root.option_add("*TLabel*Background", bg)
@@ -250,17 +285,33 @@ class ThemeManager:
             root.option_add("*TEntry*Foreground", fg)
             root.option_add("*TButton*Background", bg)
             root.option_add("*TButton*Foreground", fg)
+            root.option_add("*TCombobox*Background", bg)
+            root.option_add("*TCombobox*Foreground", fg)
+            root.option_add("*TCombobox*Listbox*Background", bg)
+            root.option_add("*TCombobox*Listbox*Foreground", fg)
+            root.option_add("*TCombobox*Listbox*SelectBackground", sel)
+            root.option_add("*TCombobox*Listbox*SelectForeground", accent_text)
+            root.option_add("*Menu*Background", menu_bg)
+            root.option_add("*Menu*Foreground", fg)
+            root.option_add("*Menu*ActiveBackground", sel)
+            root.option_add("*Menu*ActiveForeground", accent_text)
+            root.option_add("*Listbox*Background", bg)
+            root.option_add("*Listbox*Foreground", fg)
+            root.option_add("*Listbox*SelectBackground", sel)
+            root.option_add("*Listbox*SelectForeground", accent_text)
+            root.option_add("*Scrollbar*Background", bg)
+            root.option_add("*Scrollbar*TroughColor", bg)
         except Exception:
             pass
 
-        style.configure("Treeview", background=row1, fieldbackground=row1, foreground=fg)
-        style.map("Treeview", background=[("selected", sel)], foreground=[("selected", accent_text)])
+        style.configure("Treeview", background=row1, fieldbackground=row1, foreground=fg, rowheight=24, borderwidth=0, relief="flat")
+        style.map("Treeview", background=[("selected", sel), ("!disabled", row1)], foreground=[("selected", accent_text), ("!disabled", fg)])
 
         if main_tree is not None:
             try:
                 main_tree.tag_configure("evenrow", background=row1, foreground=fg)
                 main_tree.tag_configure("oddrow", background=row2, foreground=fg)
-                main_tree.tag_configure("group", background=group_bg, foreground=fg)
+                main_tree.tag_configure("group", background=group_bg, foreground=_contrast_text_color(group_bg, fg), font=("TkDefaultFont", 9, "bold"))
             except Exception:
                 pass
 
@@ -599,6 +650,10 @@ def parse_layout_line(line):
 # Load .fad layout file
 # ------------------------------------------------------------
 def load_layout_file(path):
+    path = os.fspath(path)
+    if not os.path.isabs(path):
+        path = os.path.join(APP_DIRECTORY, path)
+
     fields = []
     with open(path, "r") as f:
         lines = f.readlines()
@@ -624,6 +679,35 @@ def load_data_file(path):
 
     data = data.replace(b"\r", b"").replace(b"\n", b"")
     return bytearray(data)
+
+
+def load_data_records(path):
+    with open(path, "rb") as data_file:
+        data = data_file.read()
+    return [bytearray(record) for record in data.splitlines() if record]
+
+
+def select_layout_for_record(record, config):
+    if config.get("mode", "single") == "single":
+        return None
+
+    key_start = int(config.get("key_start", 1)) - 1
+    key_length = int(config.get("key_length", 1))
+    if key_start < 0 or key_length <= 0:
+        return None
+
+    key_value = record[key_start:key_start + key_length]
+    if isinstance(key_value, (bytes, bytearray)):
+        key = key_value.decode("utf-8", errors="replace").strip()
+    else:
+        key = str(key_value).strip()
+
+    mappings = {
+        str(mapping["key"]): mapping["layout"]
+        for mapping in config.get("mappings", [])
+        if isinstance(mapping, dict) and "key" in mapping and "layout" in mapping
+    }
+    return mappings.get(key)
 # ------------------------------------------------------------
 # Extract field value from record
 # ------------------------------------------------------------
@@ -774,76 +858,336 @@ def apply_theme_to_top_controls(root, colors):
 
 DEFAULT_THEMES = {
     "Dark Gray": {
-        "background_color": "#202020",
-        "text_color": "#e0e0e0",
-        "selection_color": "#005A9E",
-        "accent_color": "#005A9E",
+        "background_color": "#1B1B1B",
+        "text_color": "#EAEAEA",
+        "selection_color": "#4A7DB8",
+        "accent_color": "#4A7DB8",
         "accent_text_color": "#FFFFFF",
         "selection_text_color": "#FFFFFF",
-        "treeview_row_color_1": "#303030",
-        "treeview_row_color_2": "#3a3a3a",
-        "group_shading_color": "#404060",
-        "pic_type_color": "#66CCFF",
-        "menu_background_color": "#202020",
-        "status_background_color": "#202020",
+        "treeview_row_color_1": "#262626",
+        "treeview_row_color_2": "#313131",
+        "group_shading_color": "#3A4461",
+        "pic_type_color": "#7DD3FC",
+        "menu_background_color": "#1B1B1B",
+        "status_background_color": "#1B1B1B",
     },
     "Dark Blue": {
-        "background_color": "#101820",
-        "text_color": "#e0f0ff",
-        "selection_color": "#004EAF",
-        "accent_color": "#004EAF",
+        "background_color": "#101C2A",
+        "text_color": "#E6F1FF",
+        "selection_color": "#2E6FCD",
+        "accent_color": "#2E6FCD",
         "accent_text_color": "#FFFFFF",
         "selection_text_color": "#FFFFFF",
-        "treeview_row_color_1": "#182030",
-        "treeview_row_color_2": "#202d40",
-        "group_shading_color": "#3d5a7a",
-        "pic_type_color": "#66CCFF",
-        "menu_background_color": "#101820",
-        "status_background_color": "#101820",
+        "treeview_row_color_1": "#1A2A3A",
+        "treeview_row_color_2": "#233448",
+        "group_shading_color": "#35567A",
+        "pic_type_color": "#7DD3FC",
+        "menu_background_color": "#101C2A",
+        "status_background_color": "#101C2A",
     },
     "Light": {
-        "background_color": "#f0f0f0",
-        "text_color": "#000000",
-        "selection_color": "#C7E0FF",
-        "accent_color": "#C7E0FF",
-        "accent_text_color": "#000000",
-        "selection_text_color": "#000000",
-        "treeview_row_color_1": "#ffffff",
-        "treeview_row_color_2": "#f5f5f5",
-        "group_shading_color": "#dfe8ff",
-        "pic_type_color": "#66CCFF",
-        "menu_background_color": "#f0f0f0",
-        "status_background_color": "#f0f0f0",
+        "background_color": "#F3F3F3",
+        "text_color": "#111111",
+        "selection_color": "#B5D6FF",
+        "accent_color": "#B5D6FF",
+        "accent_text_color": "#111111",
+        "selection_text_color": "#111111",
+        "treeview_row_color_1": "#FFFFFF",
+        "treeview_row_color_2": "#F3F6FA",
+        "group_shading_color": "#D7E7FF",
+        "pic_type_color": "#3AA0FF",
+        "menu_background_color": "#F3F3F3",
+        "status_background_color": "#F3F3F3",
     },
     "Light Blue": {
-        "background_color": "#e6f0ff",
-        "text_color": "#000000",
-        "selection_color": "#B0D4FF",
-        "accent_color": "#B0D4FF",
-        "accent_text_color": "#000000",
-        "selection_text_color": "#000000",
-        "treeview_row_color_1": "#d0e0ff",
-        "treeview_row_color_2": "#dfeaff",
-        "group_shading_color": "#bfd3ff",
-        "pic_type_color": "#66CCFF",
-        "menu_background_color": "#e6f0ff",
-        "status_background_color": "#e6f0ff",
+        "background_color": "#EAF3FF",
+        "text_color": "#111111",
+        "selection_color": "#9CC7FF",
+        "accent_color": "#9CC7FF",
+        "accent_text_color": "#111111",
+        "selection_text_color": "#111111",
+        "treeview_row_color_1": "#F2F8FF",
+        "treeview_row_color_2": "#E5F0FF",
+        "group_shading_color": "#CBE0FF",
+        "pic_type_color": "#2D8CFF",
+        "menu_background_color": "#EAF3FF",
+        "status_background_color": "#EAF3FF",
     },
     "Blackout": {
         "background_color": "#000000",
-        "text_color": "#ffffff",
-        "selection_color": "#004EAF",
-        "accent_color": "#004EAF",
+        "text_color": "#F5F5F5",
+        "selection_color": "#2E6FCD",
+        "accent_color": "#2E6FCD",
         "accent_text_color": "#FFFFFF",
         "selection_text_color": "#FFFFFF",
-        "treeview_row_color_1": "#101010",
-        "treeview_row_color_2": "#1a1a1a",
-        "group_shading_color": "#2b2b2b",
-        "pic_type_color": "#66CCFF",
+        "treeview_row_color_1": "#121212",
+        "treeview_row_color_2": "#1B1B1B",
+        "group_shading_color": "#2B2F3B",
+        "pic_type_color": "#7DD3FC",
         "menu_background_color": "#000000",
         "status_background_color": "#000000",
     },
 }
+
+
+def open_copybook_layout_window():
+    root = tk._default_root
+    if root is None:
+        return
+
+    modal = tk.Toplevel(root)
+    modal.title("Generate Layout")
+    modal.transient(root)
+    modal.grab_set()
+    modal.resizable(False, False)
+    modal.configure(bg="#f0f0f0")
+
+    modal.update_idletasks()
+    screen_w = modal.winfo_screenwidth()
+    screen_h = modal.winfo_screenheight()
+    width = 760
+    height = 520
+    x = (screen_w - width) // 2
+    y = (screen_h - height) // 2
+    modal.geometry(f"{width}x{height}+{x}+{y}")
+
+    tool = CopybookToLayout(modal)
+    tool.pack(fill="both", expand=True)
+    modal.wait_window()
+
+
+def open_key_definition_dialog():
+    root = tk._default_root
+    if root is None:
+        return
+
+    modal = tk.Toplevel(root)
+    modal.title("Key Definition")
+    modal.transient(root)
+    modal.grab_set()
+    modal.resizable(False, False)
+
+    modal.update_idletasks()
+    w = 600
+    h = 500
+    x = (modal.winfo_screenwidth() // 2) - (w // 2)
+    y = (modal.winfo_screenheight() // 2) - (h // 2)
+    modal.geometry(f"{w}x{h}+{x}+{y}")
+
+    build_key_definition_ui(modal)
+    modal.wait_window()
+
+
+def save_key_definition(mode, key_start, key_length, mappings):
+    data = {
+        "mode": mode,
+        "key_start": key_start,
+        "key_length": key_length,
+        "mappings": mappings,
+    }
+    with open(KEY_DEFINITION_CONFIG_FILE, "w", encoding="utf-8") as config_file:
+        json.dump(data, config_file, indent=4)
+
+
+def _layout_relative_path(path):
+    absolute_path = os.path.realpath(os.path.join(APP_DIRECTORY, path))
+    layout_directory = os.path.realpath(LAYOUT_DIR)
+    if os.path.dirname(absolute_path) != layout_directory:
+        return None
+    if os.path.splitext(absolute_path)[1].lower() != ".fad":
+        return None
+    return os.path.relpath(absolute_path, APP_DIRECTORY).replace(os.sep, "/")
+
+
+def get_available_layout_files():
+    layout_files = []
+    for path in sorted(glob.glob(os.path.join(LAYOUT_DIR, "*.fad"))):
+        relative_path = _layout_relative_path(path)
+        if relative_path:
+            layout_files.append(relative_path)
+    return layout_files
+
+
+def load_key_definition():
+    defaults = {
+        "mode": "single",
+        "key_start": 1,
+        "key_length": 1,
+        "mappings": [],
+    }
+    if not os.path.exists(KEY_DEFINITION_CONFIG_FILE):
+        return defaults
+
+    try:
+        with open(KEY_DEFINITION_CONFIG_FILE, "r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except (OSError, json.JSONDecodeError):
+        return defaults
+
+    if not isinstance(config, dict):
+        return defaults
+    if config.get("mode") not in ("single", "key"):
+        config["mode"] = defaults["mode"]
+    for field in ("key_start", "key_length"):
+        try:
+            config[field] = int(config.get(field, defaults[field]))
+        except (TypeError, ValueError):
+            config[field] = defaults[field]
+    if not isinstance(config.get("mappings"), list):
+        config["mappings"] = defaults["mappings"]
+    config["mappings"] = [
+        {"key": item["key"], "layout": relative_path}
+        for item in config["mappings"]
+        if isinstance(item, dict)
+        and "key" in item
+        and "layout" in item
+        and (relative_path := _layout_relative_path(item["layout"]))
+    ]
+    return config
+
+
+def build_key_definition_ui(parent):
+    """Build the key-based layout switching dialog."""
+    frame = ttk.Frame(parent)
+    frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    config = load_key_definition()
+    mode_var = tk.StringVar(parent, value=config["mode"])
+    key_start_var = tk.StringVar(parent, value=str(config["key_start"]))
+    key_length_var = tk.StringVar(parent, value=str(config["key_length"]))
+
+    ttk.Label(frame, text="Mode:").grid(row=0, column=0, sticky="w", padx=5, pady=(0, 6))
+    ttk.Radiobutton(frame, text="Single Layout Mode", variable=mode_var, value="single").grid(
+        row=0, column=1, sticky="w", padx=(0, 12), pady=(0, 6)
+    )
+    ttk.Radiobutton(frame, text="Key Selector Mode", variable=mode_var, value="key").grid(
+        row=0, column=2, sticky="w", padx=(0, 12), pady=(0, 6)
+    )
+
+    ttk.Label(frame, text="Key Start Position:").grid(row=1, column=0, sticky="w", padx=5, pady=4)
+    ttk.Entry(frame, textvariable=key_start_var, width=12).grid(
+        row=1, column=1, sticky="w", padx=(0, 12), pady=4
+    )
+
+    ttk.Label(frame, text="Key Length:").grid(row=1, column=2, sticky="w", padx=5, pady=4)
+    ttk.Entry(frame, textvariable=key_length_var, width=12).grid(
+        row=1, column=3, sticky="w", pady=4
+    )
+
+    tree = ttk.Treeview(frame, columns=("key", "layout"), show="headings", height=12)
+    tree.heading("key", text="Key")
+    tree.heading("layout", text="Layout")
+    tree.column("key", width=140, anchor="center")
+    tree.column("layout", width=300)
+    tree.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=5, pady=(10, 6))
+    for item in config["mappings"]:
+        tree.insert("", "end", values=(item["key"], item["layout"]))
+
+    available_layouts = get_available_layout_files()
+    layout_var = tk.StringVar(parent)
+    ttk.Label(frame, text="Existing layouts:").grid(row=3, column=0, sticky="w", padx=5, pady=4)
+    layout_dropdown = ttk.Combobox(
+        frame, textvariable=layout_var, values=available_layouts, state="readonly"
+    )
+    layout_dropdown.grid(row=3, column=1, columnspan=3, sticky="ew", padx=5, pady=4)
+    if available_layouts:
+        layout_dropdown.set(available_layouts[0])
+
+    button_row = ttk.Frame(frame)
+    button_row.grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(0, 10))
+
+    def add_key():
+        key = simpledialog.askstring("Add Key", "Enter key value:", parent=parent)
+        if key is None:
+            return
+        key = key.strip()
+        if not key:
+            status_var.set("Key value cannot be blank.")
+            return
+        if any(str(tree.item(row, "values")[0]) == key for row in tree.get_children()):
+            status_var.set(f"Key '{key}' already exists.")
+            return
+        tree.insert("", "end", values=(key, ""))
+        status_var.set(f"Added key: {key}")
+
+    def remove_key():
+        selected = tree.selection()
+        if not selected:
+            status_var.set("Select a key to remove.")
+            return
+        for row in selected:
+            tree.delete(row)
+        status_var.set("Selected key removed.")
+
+    def assign_layout(layout_name, status_prefix):
+        selected = tree.selection()
+        if not selected:
+            status_var.set("Select a key first.")
+            return
+        if not layout_name:
+            status_var.set("No layout selected.")
+            return
+        relative_path = _layout_relative_path(layout_name)
+        if not relative_path:
+            status_var.set("Choose a .fad file from Fad_files.")
+            return
+        key = tree.item(selected[0], "values")[0]
+        tree.item(selected[0], values=(key, relative_path))
+        status_var.set(f"{status_prefix}: {relative_path}")
+
+    def on_load_layout():
+        selected = tree.selection()
+        if not selected:
+            status_var.set("Select a key first.")
+            return
+        filename = filedialog.askopenfilename(
+            parent=parent,
+            title="Select Layout File",
+            initialdir=LAYOUT_DIR,
+            filetypes=[("Layout Files", "*.fad")],
+        )
+        if filename:
+            assign_layout(filename, "Loaded layout")
+
+    def on_apply_layout():
+        assign_layout(layout_var.get(), "Applied layout")
+
+    ttk.Button(button_row, text="Add Key", command=add_key).pack(side="left", padx=(0, 6))
+    ttk.Button(button_row, text="Remove Key", command=remove_key).pack(side="left", padx=(0, 6))
+    ttk.Button(button_row, text="Load Layout File", command=on_load_layout).pack(side="left", padx=(0, 6))
+    ttk.Button(button_row, text="Apply Layout", command=on_apply_layout).pack(side="left")
+
+    footer = ttk.Frame(frame)
+    footer.grid(row=5, column=0, columnspan=4, sticky="ew", padx=5)
+
+    status_var = tk.StringVar(value="Ready")
+    ttk.Label(footer, textvariable=status_var, anchor="w").pack(side="left", fill="x", expand=True)
+
+    def on_save():
+        try:
+            key_start = int(key_start_var.get())
+            key_length = int(key_length_var.get())
+            mappings = []
+            for row in tree.get_children():
+                key, layout = tree.item(row)["values"]
+                mappings.append({"key": key, "layout": layout})
+            save_key_definition(mode_var.get(), key_start, key_length, mappings)
+        except ValueError:
+            status_var.set("Key start position and length must be integers.")
+            return
+        except OSError as error:
+            status_var.set(f"Could not save configuration: {error}")
+            return
+
+        status_var.set("Saved successfully.")
+        parent.destroy()
+
+    ttk.Button(footer, text="Save", command=on_save).pack(side="right", padx=(6, 0))
+    ttk.Button(footer, text="Close", command=parent.destroy).pack(side="right")
+
+    frame.columnconfigure(3, weight=1)
+    frame.rowconfigure(2, weight=1)
+
 
 # ------------------------------------------------------------
 # Main UI
@@ -919,6 +1263,38 @@ class FileAidViewer:
 
         search_text_lower = search_text.lower()
 
+        if self.key_mode:
+            for offset in range(self.total_records):
+                record_index = (self.current_record + offset) % self.total_records
+                record = self.records[record_index]
+                layout_path = select_layout_for_record(record, load_key_definition())
+                search_layout = self.layout
+                if layout_path:
+                    relative_path = _layout_relative_path(layout_path)
+                    if relative_path:
+                        try:
+                            search_layout = load_layout_file(os.path.join(APP_DIRECTORY, relative_path))
+                        except (OSError, ValueError):
+                            continue
+
+                for field_index, field in enumerate(search_layout):
+                    value = extract_field_value(record, len(record), 0, field)
+                    if search_text_lower in value.lower():
+                        self.current_record = record_index
+                        self._apply_key_layout_for_current_record()
+                        self.record_entry.delete(0, tk.END)
+                        self.record_entry.insert(0, str(record_index + 1))
+                        self.update_record_count()
+                        self.refresh_values()
+                        item = self.tree.get_children()[field_index]
+                        self.tree.selection_set(item)
+                        self.tree.see(item)
+                        self.edit_box.delete("1.0", tk.END)
+                        self.edit_box.insert("1.0", value)
+                        return
+            tk.messagebox.showinfo("Find", f"'{search_text}' not found.")
+            return
+
         # Search from current record forward, then wrap
         start_rec = self.current_record
         total = self.total_records
@@ -978,12 +1354,20 @@ class FileAidViewer:
         self.status_label.pack(fill="x", side="bottom")
 
         self.root.title("PC FileAid Viewer")
+        self.root.minsize(860, 520)
+
+        self.layout_name_var = tk.StringVar(value="Layout: (none)")
+        self.layout_name_label = ttk.Label(self.root, textvariable=self.layout_name_var, anchor="w", style="Layout.TLabel")
+        self.layout_name_label.pack(fill="x", padx=10, pady=(8, 3))
 
         self.layout = []
         self.data = bytearray()
+        self.records = []
+        self.key_mode = False
         self.record_length = 0
         self.current_record = 0
         self.data_file_path = None
+        self.current_layout_path = None
         self.total_records = 0
 
         frame = ttk.Frame(root)
@@ -993,7 +1377,10 @@ class FileAidViewer:
         # TOP CONTROLS
         # --------------------------------------------------------
         top = ttk.Frame(frame, style="Top.TFrame")
-        top.pack(fill="x", padx=6, pady=(4, 2))
+        top.pack(fill="x", padx=8, pady=(6, 4))
+
+        panel_sep = ttk.Frame(frame, height=2, style="PanelBorder.TFrame")
+        panel_sep.pack(fill="x", padx=8, pady=(0, 5))
 
         ttk.Label(top, text="Record:", style="Top.TLabel").pack(side="left", padx=(2, 6))
 
@@ -1017,12 +1404,13 @@ class FileAidViewer:
         # Data file name display
         self.filename_label = ttk.Label(top, text="No data file loaded", style="Top.TLabel")
         self.filename_label.pack(side="right", padx=10)
+        self.filename_label.configure(anchor="e")
 
 
         # --------------------------------------------------------
         # JUMP-TO-RECORD CONTROLS
         # --------------------------------------------------------
-        jump_frame = ttk.Frame(top, style="Top.TFrame")
+        jump_frame = ttk.Frame(top, style="Panel.TFrame")
         jump_frame.pack(side="left", padx=(20, 6), pady=2)
 
         ttk.Label(jump_frame, text="Jump to:", style="Top.TLabel").pack(side="left", padx=(0, 4))
@@ -1089,17 +1477,17 @@ class FileAidViewer:
         # --------------------------------------------------------
         # EDIT BOX + RULER (correct placement)
         # --------------------------------------------------------
-        bottom = ttk.Frame(frame)
-        bottom.pack(fill="x")
+        bottom = ttk.Frame(frame, style="Panel.TFrame")
+        bottom.pack(fill="x", padx=8, pady=(6, 8))
 
         # Left column: label
         label_frame = ttk.Frame(bottom)
-        label_frame.pack(side="left", padx=2, anchor="n")
+        label_frame.pack(side="left", padx=(0, 8), anchor="n")
         ttk.Label(label_frame, text="Edit field value:").pack()
 
         # Right column: ruler + textbox
         edit_frame = ttk.Frame(bottom)
-        edit_frame.pack(side="left", fill="x", expand=True)
+        edit_frame.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         # Ruler directly above textbox
         self.ruler = tk.Text(edit_frame, height=1, font=("Courier New", 10), bd=0)
@@ -1115,7 +1503,7 @@ class FileAidViewer:
         self.edit_box.pack(fill="x", expand=True)
 
         self.apply_button = ttk.Button(bottom, text="Apply", command=self.apply_edit)
-        self.apply_button.pack(side="left", padx=4)
+        self.apply_button.pack(side="left", padx=(4, 0))
 
         self.tree.bind("<<TreeviewSelect>>", self.on_field_select)
         self.value_tree.bind("<<TreeviewSelect>>", self.on_field_select)
@@ -1132,11 +1520,19 @@ class FileAidViewer:
         self.menubar = tk.Menu(self.root)
         self.root.config(menu=self.menubar)
 
+        menu_bar = self.menubar
+        layouts_menu = tk.Menu(menu_bar, tearoff=0)
+        layouts_menu.add_command(label="Generate Layout…", command=open_copybook_layout_window)
+        layouts_menu.add_command(label="Key Definition…", command=open_key_definition_dialog)
+        menu_bar.add_cascade(label="Layouts", menu=layouts_menu)
+
         filemenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="File", menu=filemenu)
 
         thememenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Theme", menu=thememenu)
+
+        self.menu_widgets = [self.menubar, layouts_menu, filemenu, thememenu]
 
         thememenu.add_command(
             label="Save Theme…",
@@ -1228,6 +1624,7 @@ class FileAidViewer:
 
         editmenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Edit", menu=editmenu)
+        self.menu_widgets.append(editmenu)
 
         editmenu.add_command(label="Insert Record", command=self.insert_record)
         editmenu.add_command(label="Delete Record", command=self.delete_record)
@@ -1243,6 +1640,29 @@ class FileAidViewer:
                 status_label=self.status_label,
                 menubar=self.menubar,
             )
+
+        self._apply_menu_theme_colors()
+
+    def _apply_menu_theme_colors(self):
+        theme = self.config.get("themes", {}).get(self.config.get("active_theme"))
+        colors = (theme or {}).get("colors", DEFAULT_THEMES.get(DEFAULT_THEME_NAME, {}))
+        bg = colors.get("background_color", "#202020")
+        fg = colors.get("text_color", "#E0E0E0")
+        sel = colors.get("selection_color", "#005A9E")
+        accent_text = colors.get("accent_text_color") or colors.get("selection_text_color") or _contrast_text_color(sel, fg)
+
+        for menu in getattr(self, "menu_widgets", []):
+            apply_menu_theme(menu, bg, fg, sel, accent_text)
+
+        try:
+            self.ruler.configure(bg=bg, fg=fg, insertbackground=fg, highlightthickness=0)
+        except Exception:
+            pass
+
+        try:
+            self.edit_box.configure(bg=bg, fg=fg, insertbackground=fg, selectbackground=sel, selectforeground=accent_text)
+        except Exception:
+            pass
     # --------------------------------------------------------
     # Scroll sync
     # --------------------------------------------------------
@@ -1272,32 +1692,30 @@ class FileAidViewer:
     # --------------------------------------------------------
     # OPEN LAYOUT
     # --------------------------------------------------------
-    def open_layout(self):
-        path = filedialog.askopenfilename(
-            title="Select .fad Layout File",
-            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
-        )
-        if not path:
-            return
-
+    def _load_layout_path(self, path, reset_record=False):
+        path = os.path.realpath(os.path.abspath(path))
         self.layout = load_layout_file(path)
+        self.current_layout_path = path
+        self.layout_name_var.set(f"Layout: {os.path.basename(path)}")
         self.tree.delete(*self.tree.get_children())
         self.value_tree.delete(*self.value_tree.get_children())
 
-        for f in self.layout:
-            tags = ("group",) if f["pic"].upper() == "GROUP" else ()
+        for field in self.layout:
+            tags = ("group",) if field["pic"].upper() == "GROUP" else ()
             self.tree.insert(
                 "",
                 "end",
-                values=(f["level"], f["name"], f["pic"], f["start"], f["end"]),
-                tags=tags
+                values=(field["level"], field["name"], field["pic"], field["start"], field["end"]),
+                tags=tags,
             )
-            self.value_tree.insert("", "end", values=(""))
+            self.value_tree.insert("", "end", values=("",))
 
         self.record_length = self.layout[-1]["end"] if self.layout else 0
-        self.current_record = 0
-
-        if self.data and self.record_length > 0:
+        if reset_record:
+            self.current_record = 0
+        if self.key_mode:
+            self.total_records = len(self.records)
+        elif self.data and self.record_length > 0:
             self.total_records = len(self.data) // self.record_length
         else:
             self.total_records = 0
@@ -1306,6 +1724,47 @@ class FileAidViewer:
         self.update_record_count()
         self.refresh_values()
         self.clear_edit_box()
+
+    def _apply_key_layout_for_current_record(self):
+        config = load_key_definition()
+        self.key_mode = config.get("mode") == "key" and bool(self.records)
+        if not self.key_mode or not 0 <= self.current_record < len(self.records):
+            return False
+
+        layout_path = select_layout_for_record(self.records[self.current_record], config)
+        if not layout_path:
+            self.status_label.config(text="No layout matches this record key; keeping the current layout.")
+            return False
+
+        relative_path = _layout_relative_path(layout_path)
+        if not relative_path:
+            self.status_label.config(text="The mapped layout must be inside Fad_files.")
+            return False
+
+        full_path = os.path.realpath(os.path.join(APP_DIRECTORY, relative_path))
+        if not os.path.isfile(full_path):
+            self.status_label.config(text=f"Mapped layout not found: {relative_path}")
+            return False
+        if full_path == self.current_layout_path:
+            return True
+
+        try:
+            self._load_layout_path(full_path)
+        except (OSError, ValueError) as error:
+            self.status_label.config(text=f"Could not load mapped layout: {error}")
+            return False
+        return True
+
+    def open_layout(self):
+        path = filedialog.askopenfilename(
+            title="Select .fad Layout File",
+            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        if not path:
+            return
+
+        self._load_layout_path(path, reset_record=True)
+        self._apply_key_layout_for_current_record()
     # --------------------------------------------------------
     # OPEN DATA FILE
     # --------------------------------------------------------
@@ -1318,11 +1777,15 @@ class FileAidViewer:
             return
 
         self.data_file_path = path
-        self.data = load_data_file(path)
+        self.key_mode = load_key_definition().get("mode") == "key"
+        self.records = load_data_records(path) if self.key_mode else []
+        self.data = bytearray(b"".join(self.records)) if self.key_mode else load_data_file(path)
 
         self.filename_label.config(text=f"Data File: {path}")
 
-        if self.record_length > 0:
+        if self.key_mode:
+            self.total_records = len(self.records)
+        elif self.record_length > 0:
             self.total_records = len(self.data) // self.record_length
         else:
             self.total_records = 0
@@ -1330,6 +1793,7 @@ class FileAidViewer:
         self.current_record = 0
         self.record_entry.delete(0, tk.END)
         self.record_entry.insert(0, "1")
+        self._apply_key_layout_for_current_record()
         self.update_record_count()
         self.refresh_values()
         self.clear_edit_box()
@@ -1338,6 +1802,8 @@ class FileAidViewer:
     # --------------------------------------------------------
     def new_data_file(self):
         self.data = bytearray()
+        self.records = []
+        self.key_mode = False
         self.data_file_path = None
 
         self.current_record = 0
@@ -1352,12 +1818,18 @@ class FileAidViewer:
         self.update_record_count()
 
         self.filename_label.config(text="New data file (unsaved)")
+        self.layout_name_var.set("Layout: (none)")
         self.update_ruler()
     # --------------------------------------------------------
     # SAVE DATA FILE
     # --------------------------------------------------------
     def save_data_file(self):
         if not self.data_file_path:
+            return
+
+        if self.key_mode:
+            with open(self.data_file_path, "wb") as data_file:
+                data_file.write(b"\r\n".join(self.records))
             return
 
         if self.record_length <= 0:
@@ -1388,6 +1860,13 @@ class FileAidViewer:
         if not path:
             return
 
+        if self.key_mode:
+            with open(path, "wb") as data_file:
+                data_file.write(b"\r\n".join(self.records))
+            self.data_file_path = path
+            self.filename_label.config(text=f"Data File: {path}")
+            return
+
         if self.record_length <= 0:
             return
 
@@ -1414,6 +1893,7 @@ class FileAidViewer:
             self.current_record -= 1
             self.record_entry.delete(0, tk.END)
             self.record_entry.insert(0, str(self.current_record + 1))
+            self._apply_key_layout_for_current_record()
             self.update_record_count()
             self.refresh_values()
             self.clear_edit_box()
@@ -1422,6 +1902,7 @@ class FileAidViewer:
             self.current_record += 1
             self.record_entry.delete(0, tk.END)
             self.record_entry.insert(0, str(self.current_record + 1))
+            self._apply_key_layout_for_current_record()
             self.update_record_count()
             self.refresh_values()
             self.clear_edit_box()
@@ -1429,7 +1910,7 @@ class FileAidViewer:
     # JUMP TO RECORD
     # --------------------------------------------------------
     def jump_to_record(self):
-        if self.total_records == 0 or self.record_length == 0:
+        if self.total_records == 0 or (not self.key_mode and self.record_length == 0):
             return
 
         try:
@@ -1447,6 +1928,7 @@ class FileAidViewer:
         self.record_entry.delete(0, tk.END)
         self.record_entry.insert(0, str(self.current_record + 1))
 
+        self._apply_key_layout_for_current_record()
         self.update_record_count()
         self.refresh_values()
         self.clear_edit_box()
@@ -1454,6 +1936,23 @@ class FileAidViewer:
     # INSERT RECORD (after current)
     # --------------------------------------------------------
     def insert_record(self):
+        if self.key_mode:
+            if not self.records:
+                return
+            new_record = bytearray(b" " * len(self.records[self.current_record]))
+            insert_index = self.current_record + 1
+            self.records.insert(insert_index, new_record)
+            self.data = bytearray(b"".join(self.records))
+            self.current_record = insert_index
+            self.total_records = len(self.records)
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            self._apply_key_layout_for_current_record()
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+            return
+
         if self.record_length <= 0:
             return
 
@@ -1476,6 +1975,22 @@ class FileAidViewer:
     # DELETE RECORD
     # --------------------------------------------------------
     def delete_record(self):
+        if self.key_mode:
+            if not self.records:
+                return
+            del self.records[self.current_record]
+            self.data = bytearray(b"".join(self.records))
+            self.total_records = len(self.records)
+            self.current_record = min(self.current_record, max(0, self.total_records - 1))
+            self.record_entry.delete(0, tk.END)
+            self.record_entry.insert(0, str(self.current_record + 1))
+            if self.records:
+                self._apply_key_layout_for_current_record()
+            self.update_record_count()
+            self.refresh_values()
+            self.clear_edit_box()
+            return
+
         if self.record_length <= 0 or self.total_records == 0:
             return
 
@@ -1507,13 +2022,15 @@ class FileAidViewer:
     # --------------------------------------------------------
     def refresh_values(self):
         self.value_tree.delete(*self.value_tree.get_children())
-        for f in self.layout:
-            val = extract_field_value(
-                self.data,
-                self.record_length,
-                self.current_record,
-                f
-            )
+        if self.key_mode and 0 <= self.current_record < len(self.records):
+            record = self.records[self.current_record]
+            for field in self.layout:
+                val = extract_field_value(record, len(record), 0, field)
+                self.value_tree.insert("", "end", values=(val,))
+            return
+
+        for field in self.layout:
+            val = extract_field_value(self.data, self.record_length, self.current_record, field)
             self.value_tree.insert("", "end", values=(val,))
     # --------------------------------------------------------
     # FIELD SELECT
@@ -1544,12 +2061,11 @@ class FileAidViewer:
                 self.tree.selection_set(self.tree.get_children()[index])
 
         field = self.layout[index]
-        val = extract_field_value(
-            self.data,
-            self.record_length,
-            self.current_record,
-            field
-        )
+        if self.key_mode and 0 <= self.current_record < len(self.records):
+            record = self.records[self.current_record]
+            val = extract_field_value(record, len(record), 0, field)
+        else:
+            val = extract_field_value(self.data, self.record_length, self.current_record, field)
 
         self.edit_box.delete("1.0", tk.END)
         self.edit_box.insert("1.0", val)
@@ -1572,10 +2088,6 @@ class FileAidViewer:
         end   = field["end"]
         length = end - start
 
-        offset = self.current_record * self.record_length + start
-        if offset < 0 or offset + length > len(self.data):
-            return
-
         encoded = new_text.encode("utf-8", errors="replace")
 
         if len(encoded) < length:
@@ -1583,7 +2095,17 @@ class FileAidViewer:
         else:
             encoded = encoded[:length]
 
-        self.data[offset:offset + length] = encoded
+        if self.key_mode:
+            record = self.records[self.current_record]
+            if start < 0 or start + length > len(record):
+                return
+            record[start:start + length] = encoded
+            self.data = bytearray(b"".join(self.records))
+        else:
+            offset = self.current_record * self.record_length + start
+            if offset < 0 or offset + length > len(self.data):
+                return
+            self.data[offset:offset + length] = encoded
         self.refresh_values()
     # --------------------------------------------------------
     # CLEAR EDIT BOX

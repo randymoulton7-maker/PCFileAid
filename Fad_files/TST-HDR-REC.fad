@@ -1,0 +1,13 @@
+-------- FIELD LEVEL/NAME --------- --PICTURE--    FLD  START     END  LENGTH
+
+    5 TST-HDR-REC              GROUP         1       1     265     265
+   10 TST-HDR-RECORD-TYPE      X(2)          2       1       2       2
+   10 TST-HDR-PRI              X(09)         3       3      11       9
+   10 TST-HDR-SIN              X(11)         4      12      22      11
+   10 TST-HDR-LAST-NAME        X(30)         5      23      52      30
+   10 TST-HDR-FIRST-NAME       X(20)         6      53      72      20
+   10 TST-HDR-MIDDLE           X(03)         7      73      75       3
+   10 TST-HDR-ADDRESS-STREET   X(55)         8      76     130      55
+   10 TST-HDR-ADDRESS-POST-CD  X(55)         9     131     185      55
+   10 TST-HDR-ADDRESS-CITY     X(55)        10     186     240      55
+   10 TST-HDR-PROVINCE         X(25)        11     241     265      25

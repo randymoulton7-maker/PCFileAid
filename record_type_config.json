@@ -1,0 +1,19 @@
+{
+    "mode": "key",
+    "key_start": 1,
+    "key_length": 2,
+    "mappings": [
+        {
+            "key": "A1",
+            "layout": "Fad_files/TST-HDR-REC.fad"
+        },
+        {
+            "key": "A2",
+            "layout": "Fad_files/TST-DTL-DAT.fad"
+        },
+        {
+            "key": "A9",
+            "layout": "Fad_files/TST-TRL-DATA.fad"
+        }
+    ]
+}

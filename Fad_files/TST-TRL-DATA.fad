@@ -1,0 +1,8 @@
+-------- FIELD LEVEL/NAME --------- --PICTURE--    FLD  START     END  LENGTH
+
+    5 TST-TRL-DATA             GROUP         1       1      36      36
+   10 TST-RECORD-TYPE          X(2)          2       1       2       2
+   10 TST-PRI                  X(09)         3       3      11       9
+   10 TST-EMP-CDN-INT-AMT      X(11)         4      12      22      11
+   10 TST-YEAR                 X(04)         5      23      26       4
+   10 TST-ISSUE-DATE           X(10)         6      27      36      10

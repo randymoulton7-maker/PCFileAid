@@ -1,0 +1,6 @@
+-------- FIELD LEVEL/NAME --------- --PICTURE--    FLD  START     END  LENGTH
+
+    5 TST-DTL-DATA             GROUP         1       1      22      22
+   10 TST-DTL-RECORD-TYPE      X(2)          2       1       2       2
+   10 TST-DTL-PRI              X(09)         3       3      11       9
+   10 TST-DTL-EMP-CDN-INT-AMT  X(11)         4      12      22      11

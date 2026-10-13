@@ -3,6 +3,16 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 
+APP_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+COPYBOOK_DIRECTORY = os.path.join(APP_DIRECTORY, "Copybook_files")
+FAD_DIRECTORY = os.path.join(APP_DIRECTORY, "Fad_files")
+
+
+def default_fad_output(input_file):
+    os.makedirs(FAD_DIRECTORY, exist_ok=True)
+    return os.path.join(FAD_DIRECTORY, os.path.splitext(os.path.basename(input_file))[0] + ".fad")
+
+
 # ------------------------------------------------------------
 # PIC length calculator
 # ------------------------------------------------------------
@@ -201,7 +211,49 @@ def convert_copybook(input_file, fad_output):
         for node in tree:
             write_node(out, node)
 
-    print("Layout file written to:", fad_output)
+    return fad_output
+
+
+class CopybookToLayout(tk.Frame):
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.copybook_path = tk.StringVar(value="")
+        self.output_path = tk.StringVar(value="")
+
+        self.configure(bg="#f0f0f0")
+        self.grid_columnconfigure(1, weight=1)
+
+        tk.Label(self, text="Copybook File:", bg="#f0f0f0", anchor="w").grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
+        self.copybook_entry = tk.Entry(self, textvariable=self.copybook_path, width=60)
+        self.copybook_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=(12, 6))
+        tk.Button(self, text="Browse", command=self.browse_copybook).grid(row=0, column=2, padx=(0, 12), pady=(12, 6))
+
+        tk.Label(self, text="Output .fad:", bg="#f0f0f0", anchor="w").grid(row=1, column=0, sticky="ew", padx=12, pady=6)
+        self.output_entry = tk.Entry(self, textvariable=self.output_path, width=60)
+        self.output_entry.grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=6)
+
+        tk.Button(self, text="Generate Layout", command=self.generate_layout).grid(row=2, column=1, sticky="w", padx=(0, 8), pady=(8, 12))
+
+    def browse_copybook(self):
+        path = filedialog.askopenfilename(
+            title="Select COBOL Copybook",
+            initialdir=COPYBOOK_DIRECTORY if os.path.isdir(COPYBOOK_DIRECTORY) else APP_DIRECTORY,
+            filetypes=[("COBOL Copybook", "*.cbl"), ("Text Files", "*.txt"), ("All Files", "*.*")],
+        )
+        if not path:
+            return
+
+        self.copybook_path.set(path)
+        self.output_path.set(default_fad_output(path))
+
+    def generate_layout(self):
+        input_file = self.copybook_path.get().strip()
+        if not input_file:
+            return
+
+        output_file = self.output_path.get().strip() or default_fad_output(input_file)
+        convert_copybook(input_file, output_file)
+
 
 # ------------------------------------------------------------
 # Run with File Dialog
@@ -216,8 +268,7 @@ if __name__ == "__main__":
     )
 
     if not input_file:
-        print("No file selected.")
         raise SystemExit
 
-    fad_output = os.path.splitext(input_file)[0] + ".fad"
+    fad_output = default_fad_output(input_file)
     convert_copybook(input_file, fad_output)
