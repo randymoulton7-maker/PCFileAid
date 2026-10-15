@@ -1,0 +1,8 @@
+-------- FIELD LEVEL/NAME --------- --PICTURE--    FLD  START     END  LENGTH
+
+    1 TEST-BINARY-RECORD       GROUP         1       1      13      13 GROUP   
+    5 EBCDIC-123               GROUP         2       1       3       3 GROUP   
+   10 EBCDIC-ID                X(3)          3       1       3       3 EBCDIC  
+    5 POS-COMP3                S9(5)         4       4       6       3 COMP-3  
+    5 NEG-COMP3                S9(5)         5       7       9       3 COMP-3  
+    5 ASCII-ABCD               X(4)          6      10      13       4 ASCII   

@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog, messagebox
 from tkinter import colorchooser
-from copybook_to_layout import CopybookToLayout
+from copybook_to_layout import CopybookToLayout, COPYBOOK_DIR, DATA_DIR, LAYOUT_DIR
+from binary_lab import BinaryLabWindow
 
 # ------------------------------------------------------------
 # NEW: Theme model + config store (cleaner, maintainable design)
@@ -14,7 +15,6 @@ from dataclasses import dataclass, field
 CONFIG_FILENAME = "pcfileaid_config.json"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_FILENAME)
 APP_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
-LAYOUT_DIR = os.path.join(APP_DIRECTORY, "Fad_files")
 KEY_DEFINITION_CONFIG_FILE = os.path.join(
     APP_DIRECTORY, "record_type_config.json"
 )
@@ -644,7 +644,8 @@ def parse_layout_line(line):
         "pic": pic,
         "fld": int(fld) if fld else 0,
         "start": int(start),
-        "end": int(end)
+        "end": int(end),
+        "type": line[70:].strip().upper() if len(line) > 70 else "",
     }
 # ------------------------------------------------------------
 # Load .fad layout file
@@ -989,22 +990,29 @@ def save_key_definition(mode, key_start, key_length, mappings):
         json.dump(data, config_file, indent=4)
 
 
-def _layout_relative_path(path):
-    absolute_path = os.path.realpath(os.path.join(APP_DIRECTORY, path))
+def _layout_filename(path):
+    path = os.fspath(path)
+    if os.path.isabs(path):
+        candidate_path = path
+    elif os.path.dirname(path):
+        candidate_path = os.path.join(APP_DIRECTORY, path)
+    else:
+        candidate_path = os.path.join(LAYOUT_DIR, path)
+    absolute_path = os.path.realpath(candidate_path)
     layout_directory = os.path.realpath(LAYOUT_DIR)
     if os.path.dirname(absolute_path) != layout_directory:
         return None
     if os.path.splitext(absolute_path)[1].lower() != ".fad":
         return None
-    return os.path.relpath(absolute_path, APP_DIRECTORY).replace(os.sep, "/")
+    return os.path.basename(absolute_path)
 
 
 def get_available_layout_files():
     layout_files = []
     for path in sorted(glob.glob(os.path.join(LAYOUT_DIR, "*.fad"))):
-        relative_path = _layout_relative_path(path)
-        if relative_path:
-            layout_files.append(relative_path)
+        filename = _layout_filename(path)
+        if filename:
+            layout_files.append(filename)
     return layout_files
 
 
@@ -1036,12 +1044,12 @@ def load_key_definition():
     if not isinstance(config.get("mappings"), list):
         config["mappings"] = defaults["mappings"]
     config["mappings"] = [
-        {"key": item["key"], "layout": relative_path}
+        {"key": item["key"], "layout": filename}
         for item in config["mappings"]
         if isinstance(item, dict)
         and "key" in item
         and "layout" in item
-        and (relative_path := _layout_relative_path(item["layout"]))
+        and (filename := _layout_filename(item["layout"]))
     ]
     return config
 
@@ -1127,34 +1135,19 @@ def build_key_definition_ui(parent):
         if not layout_name:
             status_var.set("No layout selected.")
             return
-        relative_path = _layout_relative_path(layout_name)
-        if not relative_path:
-            status_var.set("Choose a .fad file from Fad_files.")
+        filename = _layout_filename(layout_name)
+        if not filename:
+            status_var.set(f"Choose a .fad file from {os.path.basename(LAYOUT_DIR)}.")
             return
         key = tree.item(selected[0], "values")[0]
-        tree.item(selected[0], values=(key, relative_path))
-        status_var.set(f"{status_prefix}: {relative_path}")
-
-    def on_load_layout():
-        selected = tree.selection()
-        if not selected:
-            status_var.set("Select a key first.")
-            return
-        filename = filedialog.askopenfilename(
-            parent=parent,
-            title="Select Layout File",
-            initialdir=LAYOUT_DIR,
-            filetypes=[("Layout Files", "*.fad")],
-        )
-        if filename:
-            assign_layout(filename, "Loaded layout")
+        tree.item(selected[0], values=(key, filename))
+        status_var.set(f"{status_prefix}: {filename}")
 
     def on_apply_layout():
         assign_layout(layout_var.get(), "Applied layout")
 
     ttk.Button(button_row, text="Add Key", command=add_key).pack(side="left", padx=(0, 6))
     ttk.Button(button_row, text="Remove Key", command=remove_key).pack(side="left", padx=(0, 6))
-    ttk.Button(button_row, text="Load Layout File", command=on_load_layout).pack(side="left", padx=(0, 6))
     ttk.Button(button_row, text="Apply Layout", command=on_apply_layout).pack(side="left")
 
     footer = ttk.Frame(frame)
@@ -1270,10 +1263,10 @@ class FileAidViewer:
                 layout_path = select_layout_for_record(record, load_key_definition())
                 search_layout = self.layout
                 if layout_path:
-                    relative_path = _layout_relative_path(layout_path)
-                    if relative_path:
+                    filename = _layout_filename(layout_path)
+                    if filename:
                         try:
-                            search_layout = load_layout_file(os.path.join(APP_DIRECTORY, relative_path))
+                            search_layout = load_layout_file(os.path.join(LAYOUT_DIR, filename))
                         except (OSError, ValueError):
                             continue
 
@@ -1369,6 +1362,7 @@ class FileAidViewer:
         self.data_file_path = None
         self.current_layout_path = None
         self.total_records = 0
+        self.binary_lab_window = None
 
         frame = ttk.Frame(root)
         frame.pack(fill="both", expand=True)
@@ -1529,10 +1523,14 @@ class FileAidViewer:
         filemenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="File", menu=filemenu)
 
+        tools_menu = tk.Menu(self.menubar, tearoff=0)
+        tools_menu.add_command(label="Binary Lab...", command=self.open_binary_lab)
+        self.menubar.add_cascade(label="Tools", menu=tools_menu)
+
         thememenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Theme", menu=thememenu)
 
-        self.menu_widgets = [self.menubar, layouts_menu, filemenu, thememenu]
+        self.menu_widgets = [self.menubar, layouts_menu, filemenu, tools_menu, thememenu]
 
         thememenu.add_command(
             label="Save Theme…",
@@ -1692,6 +1690,25 @@ class FileAidViewer:
     # --------------------------------------------------------
     # OPEN LAYOUT
     # --------------------------------------------------------
+    def open_binary_lab(self):
+        if self.binary_lab_window is not None:
+            try:
+                if self.binary_lab_window.winfo_exists():
+                    self.binary_lab_window.deiconify()
+                    self.binary_lab_window.lift()
+                    self.binary_lab_window.focus_set()
+                    return
+            except tk.TclError:
+                pass
+
+        self.binary_lab_window = BinaryLabWindow(
+            self.root,
+            DATA_DIR,
+            LAYOUT_DIR,
+            APP_DIRECTORY,
+            load_layout_file,
+        )
+
     def _load_layout_path(self, path, reset_record=False):
         path = os.path.realpath(os.path.abspath(path))
         self.layout = load_layout_file(path)
@@ -1736,14 +1753,16 @@ class FileAidViewer:
             self.status_label.config(text="No layout matches this record key; keeping the current layout.")
             return False
 
-        relative_path = _layout_relative_path(layout_path)
-        if not relative_path:
-            self.status_label.config(text="The mapped layout must be inside Fad_files.")
+        filename = _layout_filename(layout_path)
+        if not filename:
+            self.status_label.config(
+                text=f"The mapped layout must be inside {os.path.basename(LAYOUT_DIR)}."
+            )
             return False
 
-        full_path = os.path.realpath(os.path.join(APP_DIRECTORY, relative_path))
+        full_path = os.path.realpath(os.path.join(LAYOUT_DIR, filename))
         if not os.path.isfile(full_path):
-            self.status_label.config(text=f"Mapped layout not found: {relative_path}")
+            self.status_label.config(text=f"Mapped layout not found: {filename}")
             return False
         if full_path == self.current_layout_path:
             return True
@@ -1758,7 +1777,8 @@ class FileAidViewer:
     def open_layout(self):
         path = filedialog.askopenfilename(
             title="Select .fad Layout File",
-            filetypes=[("FAD Files", "*.fad"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+            initialdir=LAYOUT_DIR if os.path.isdir(LAYOUT_DIR) else APP_DIRECTORY,
+            filetypes=[("FAD Files", "*.fad")]
         )
         if not path:
             return
@@ -1771,6 +1791,7 @@ class FileAidViewer:
     def open_data(self):
         path = filedialog.askopenfilename(
             title="Select Data File",
+            initialdir=DATA_DIR if os.path.isdir(DATA_DIR) else APP_DIRECTORY,
             filetypes=[("All Files", "*.*")]
         )
         if not path:

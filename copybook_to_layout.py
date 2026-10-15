@@ -4,19 +4,20 @@ import tkinter as tk
 from tkinter import filedialog
 
 APP_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
-COPYBOOK_DIRECTORY = os.path.join(APP_DIRECTORY, "Copybook_files")
-FAD_DIRECTORY = os.path.join(APP_DIRECTORY, "Fad_files")
+COPYBOOK_DIR = os.path.join(APP_DIRECTORY, "Copybook_files")
+DATA_DIR = os.path.join(APP_DIRECTORY, "Data_files")
+LAYOUT_DIR = os.path.join(APP_DIRECTORY, "Fad_files")
 
 
 def default_fad_output(input_file):
-    os.makedirs(FAD_DIRECTORY, exist_ok=True)
-    return os.path.join(FAD_DIRECTORY, os.path.splitext(os.path.basename(input_file))[0] + ".fad")
+    os.makedirs(LAYOUT_DIR, exist_ok=True)
+    return os.path.join(LAYOUT_DIR, os.path.splitext(os.path.basename(input_file))[0] + ".fad")
 
 
 # ------------------------------------------------------------
 # PIC length calculator
 # ------------------------------------------------------------
-def pic_length(pic):
+def pic_length(pic, usage=None):
     if not pic:
         return None
     pic = pic.strip().upper()
@@ -25,10 +26,19 @@ def pic_length(pic):
     m = re.match(r"X\((\d+)\)", pic)
     if m:
         return int(m.group(1))
-    m = re.match(r"9\((\d+)\)", pic)
+    m = re.fullmatch(r"S?9\((\d+)\)", pic)
     if m:
-        return int(m.group(1))
-    if pic in ("X", "9"):
+        digits = int(m.group(1))
+        if (usage or "").upper() == "COMP-3":
+            return (digits + 2) // 2
+        if (usage or "").upper() == "COMP":
+            if digits <= 4:
+                return 2
+            if digits <= 9:
+                return 4
+            return 8
+        return digits
+    if pic in ("X", "9", "S9"):
         return 1
     return None
 
@@ -52,14 +62,6 @@ def parse_copybook_line(line):
         stripped = stripped[:-1]
     stripped = re.sub(r"\s+", " ", stripped)
 
-    # Abort if COMP / COMP-3 / COMP-5 appears
-    upper_line = stripped.upper()
-    if " COMP" in upper_line or "COMP-" in upper_line:
-        print("ERROR: COMP / COMP-3 / COMP-5 fields detected.")
-        print("Binary fields cannot be decoded safely on Windows.")
-        print("Operation aborted.")
-        raise SystemExit
-
     # Must start with a level number
     parts = stripped.split(" ")
     if not parts or not parts[0].isdigit():
@@ -74,6 +76,7 @@ def parse_copybook_line(line):
         occurs = int(occ.group(1))
 
     # Detect PIC clause
+    usage = None
     if " PIC " in stripped.upper():
         before_pic, after_pic = re.split(r"\bPIC\b", stripped, maxsplit=1, flags=re.IGNORECASE)
         before_pic = before_pic.strip()
@@ -83,13 +86,25 @@ def parse_copybook_line(line):
         name = tokens[1] if len(tokens) >= 2 else "FILLER"
 
         pic = after_pic.split(" ")[0]
+        usage_match = re.search(r"\b(COMP-3|COMP-5|COMP)\b", after_pic, re.IGNORECASE)
+        if usage_match:
+            usage = usage_match.group(1).upper()
+            if usage not in ("COMP", "COMP-3"):
+                raise ValueError(f"Unsupported binary usage: {usage}; only COMP and COMP-3 are supported.")
 
     else:
         tokens = stripped.split(" ")
         name = tokens[1] if len(tokens) >= 2 else "FILLER"
         pic = "GROUP"
 
-    return {"level": level, "name": name, "pic": pic, "occurs": occurs, "children": []}
+    return {
+        "level": level,
+        "name": name,
+        "pic": pic,
+        "usage": usage,
+        "occurs": occurs,
+        "children": [],
+    }
 
 # ------------------------------------------------------------
 # Build hierarchical tree
@@ -118,7 +133,9 @@ def assign_offsets(node, offset, fld_counter):
     fld_counter[0] += 1
 
     if node["pic"] != "GROUP":
-        length = pic_length(node["pic"])
+        length = pic_length(node["pic"], node.get("usage"))
+        if length is None:
+            raise ValueError(f"Unsupported PIC clause: {node['pic']}")
         node["length"] = length
         node["start"] = offset
         node["end"] = offset + length - 1
@@ -148,6 +165,22 @@ def assign_offsets(node, offset, fld_counter):
 # ------------------------------------------------------------
 # Write FileAid-style rows (flattened OCCURS, no blanks)
 # ------------------------------------------------------------
+def field_storage_type(node):
+    if node["pic"] == "GROUP":
+        return "GROUP"
+    usage = node.get("usage")
+    if usage:
+        return usage
+    return "DISPLAY"
+
+
+def write_layout_row(out, level, name, node, fld, start, end, length):
+    out.write(
+        "%5d %-25s%-10s%5d%8d%8d%8d %-8s\n"
+        % (level, name, node["pic"], fld, start, end, length, field_storage_type(node))
+    )
+
+
 def write_node(out, node):
     # GROUP with OCCURS: produce ONE line per occurrence, no blank lines
     if node["pic"] == "GROUP" and node.get("occurs"):
@@ -160,12 +193,16 @@ def write_node(out, node):
             occ_end = occ_start + group_len - 1
 
             # GROUP line
-            out.write("%5d %-25s%-10s%5d%8d%8d%8d\n" %
-                      (node["level"],
-                       f"{node['name']}({n})",
-                       "GROUP",
-                       node["fld"],
-                       occ_start, occ_end, group_len))
+            write_layout_row(
+                out,
+                node["level"],
+                f"{node['name']}({n})",
+                node,
+                node["fld"],
+                occ_start,
+                occ_end,
+                group_len,
+            )
 
             # Children
             for child in node["children"]:
@@ -174,19 +211,30 @@ def write_node(out, node):
                 c_start = occ_start + rel
                 c_end = c_start + child_len - 1
 
-                out.write("%5d %-25s%-10s%5d%8d%8d%8d\n" %
-                          (child["level"],
-                           f"{child['name']}({n})",
-                           child["pic"],
-                           child["fld"],
-                           c_start, c_end, child_len))
+                write_layout_row(
+                    out,
+                    child["level"],
+                    f"{child['name']}({n})",
+                    child,
+                    child["fld"],
+                    c_start,
+                    c_end,
+                    child_len,
+                )
 
         return
 
     # Normal field
-    out.write("%5d %-25s%-10s%5d%8d%8d%8d\n" %
-              (node["level"], node["name"], node["pic"],
-               node["fld"], node["start"], node["end"], node["length"]))
+    write_layout_row(
+        out,
+        node["level"],
+        node["name"],
+        node,
+        node["fld"],
+        node["start"],
+        node["end"],
+        node["length"],
+    )
 
     for child in node["children"]:
         write_node(out, child)
@@ -237,7 +285,7 @@ class CopybookToLayout(tk.Frame):
     def browse_copybook(self):
         path = filedialog.askopenfilename(
             title="Select COBOL Copybook",
-            initialdir=COPYBOOK_DIRECTORY if os.path.isdir(COPYBOOK_DIRECTORY) else APP_DIRECTORY,
+            initialdir=COPYBOOK_DIR if os.path.isdir(COPYBOOK_DIR) else APP_DIRECTORY,
             filetypes=[("COBOL Copybook", "*.cbl"), ("Text Files", "*.txt"), ("All Files", "*.*")],
         )
         if not path:
@@ -264,6 +312,7 @@ if __name__ == "__main__":
 
     input_file = filedialog.askopenfilename(
         title="Select COBOL Copybook",
+        initialdir=COPYBOOK_DIR if os.path.isdir(COPYBOOK_DIR) else APP_DIRECTORY,
         filetypes=[("COBOL Copybook", "*.cbl"), ("Text Files", "*.txt"), ("All Files", "*.*")]
     )
 
